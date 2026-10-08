@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Busur Headphone (Headband) -->
+    <path
+        android:pathData="M32,54 C32,41.85 41.85,32 54,32 C66.15,32 76,41.85 76,54"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="32"
+                android:startY="32"
+                android:endX="76"
+                android:endY="54"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF4081" />
+                <item android:offset="0.5" android:color="#E040FB" />
+                <item android:offset="1.0" android:color="#7C4DFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Ear Cup Kiri -->
+    <path
+        android:pathData="M27,51 C27,48.8 28.8,47 31,47 L33,47 C35.2,47 37,48.8 37,51 L37,63 C37,65.2 35.2,67 33,67 L31,67 C28.8,67 27,65.2 27,63 Z"
+        android:fillColor="#FF4081" />
+
+    <!-- Ear Cup Kanan -->
+    <path
+        android:pathData="M71,51 C71,48.8 72.8,47 75,47 L77,47 C79.2,47 81,48.8 81,51 L81,63 C81,65.2 79.2,67 77,67 L75,67 C72.8,67 71,65.2 71,63 Z"
+        android:fillColor="#7C4DFF" />
+
+    <!-- Not Balok Tengah (Music Note) -->
+    <path
+        android:pathData="M48,64 C48,61.8 46.2,60 44,60 C41.8,60 40,61.8 40,64 C40,66.2 41.8,68 44,68 C46.2,68 48,66.2 48,64 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M64,60 C64,57.8 62.2,56 60,56 C57.8,56 56,57.8 56,60 C56,62.2 57.8,64 60,64 C62.2,64 64,62.2 64,60 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M47,64 L47,44 L63,40 L63,60"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M47,44 L63,40"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+</vector>
