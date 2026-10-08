@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.LiveEqualizerIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
@@ -147,14 +151,27 @@ fun NowPlayingSheet(
                     )
                 }
 
-                Text(
-                    text = "SEDANG DIPUTAR",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    LiveEqualizerIndicator(
+                        isPlaying = playbackState.isPlaying,
+                        tint = MaterialTheme.colorScheme.primary,
+                        maxHeight = 14.dp,
+                        barWidth = 2.5.dp,
+                        spacing = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SEDANG DIPUTAR",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 val isSleepTimerActive = playbackState.sleepTimerRemainingSeconds > 0
                 IconButton(onClick = { showSleepTimerDialog = true }) {
@@ -178,7 +195,7 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ─── Artwork Cover ──────────────────────────────────────────────────────
+            // ─── Artwork Cover dengan Ambient Halo Glow ─────────────────────────────
             val hasCustomCover = song.albumArtUri.startsWith("file://")
             val isBlankOrError = song.albumArtUri.isBlank() || isImageError
 
@@ -187,92 +204,122 @@ fun NowPlayingSheet(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
                     .aspectRatio(1f)
-                    .shadow(16.dp, RoundedCornerShape(24.dp))
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable {
-                        if (hasCustomCover) {
-                            showCoverOptionsDialog = true
-                        } else {
-                            pickImageLauncher.launch("image/*")
-                        }
-                    }
             ) {
-                if (!isBlankOrError) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = "Cover Album ${song.album}",
-                        contentScale = ContentScale.Crop,
-                        onError = { isImageError = true },
-                        onSuccess = { isImageError = false },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                // Ambient Halo Glow Layer di belakang cover
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(0.92f)
+                        .shadow(
+                            elevation = 36.dp,
+                            shape = RoundedCornerShape(28.dp),
+                            ambientColor = MaterialTheme.colorScheme.primary,
+                            spotColor = MaterialTheme.colorScheme.primary
+                        )
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                    Color.Transparent
+                                )
+                            ),
+                            shape = RoundedCornerShape(28.dp)
+                        )
+                )
 
-                    // Tombol edit cover melayang di pojok kanan bawah
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        shadowElevation = 6.dp,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(12.dp)
-                            .size(42.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                if (hasCustomCover) {
-                                    showCoverOptionsDialog = true
-                                } else {
-                                    pickImageLauncher.launch("image/*")
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Ubah Cover Album",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
+                // Kartu Album Art Utama
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(16.dp, RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            if (hasCustomCover) {
+                                showCoverOptionsDialog = true
+                            } else {
+                                pickImageLauncher.launch("image/*")
+                            }
                         }
-                    }
-                } else {
-                    // Fallback interaktif jika belum ada cover atau gambar gagal dimuat
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp)
-                    ) {
+                ) {
+                    if (!isBlankOrError) {
+                        AsyncImage(
+                            model = song.albumArtUri,
+                            contentDescription = "Cover Album ${song.album}",
+                            contentScale = ContentScale.Crop,
+                            onError = { isImageError = true },
+                            onSuccess = { isImageError = false },
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Tombol edit cover melayang di pojok kanan bawah
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.size(76.dp)
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(12.dp)
+                                .size(42.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            IconButton(
+                                onClick = {
+                                    if (hasCustomCover) {
+                                        showCoverOptionsDialog = true
+                                    } else {
+                                        pickImageLauncher.launch("image/*")
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.AddPhotoAlternate,
-                                    contentDescription = "Tambah Cover Album",
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Ubah Cover Album",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "Tambah Cover Album",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Ketuk untuk memilih foto dari galeri",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                    } else {
+                        // Fallback interaktif dengan gradien artistik
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            AlbumArtPlaceholder(
+                                seed = song.title,
+                                modifier = Modifier.matchParentSize(),
+                                iconSize = 48.dp
+                            )
+
+                            // Overlay info tambah cover
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.Black.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .align(Alignment.BottomCenter)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AddPhotoAlternate,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Tambah Cover",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

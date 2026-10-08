@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
+import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.LiveEqualizerIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -162,18 +164,18 @@ private fun QueueItemRow(
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-            )
-            if (song.albumArtUri.isBlank()) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
+            if (song.albumArtUri.isNotBlank()) {
+                AsyncImage(
+                    model = song.albumArtUri,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else {
+                AlbumArtPlaceholder(
+                    seed = song.title,
+                    modifier = Modifier.matchParentSize(),
+                    iconSize = 20.dp
                 )
             }
         }
@@ -200,16 +202,23 @@ private fun QueueItemRow(
             )
         }
 
-        // Indikator aktif
+        // Indikator aktif dengan Live Equalizer Berdenyut
         if (isPlaying) {
-            Icon(
-                imageVector = Icons.Default.GraphicEq,
-                contentDescription = "Sedang diputar",
-                tint = MaterialTheme.colorScheme.primary,
+            Box(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .size(20.dp)
-            )
+                    .padding(horizontal = 6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            ) {
+                LiveEqualizerIndicator(
+                    isPlaying = true,
+                    tint = MaterialTheme.colorScheme.primary,
+                    maxHeight = 14.dp,
+                    barWidth = 2.5.dp,
+                    spacing = 2.dp
+                )
+            }
         }
 
         // Tombol Geser Ke Atas

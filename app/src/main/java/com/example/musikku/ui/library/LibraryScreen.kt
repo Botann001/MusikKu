@@ -26,9 +26,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.LiveEqualizerIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
@@ -246,6 +250,7 @@ fun LibraryScreen(
                     SongList(
                         songs = uiState.songs,
                         currentSongId = playbackState.currentSong?.id,
+                        isPlaying = playbackState.isPlaying,
                         favoriteSongIds = uiState.favoriteSongIds,
                         sortOrder = uiState.sortOrder,
                         onSortOrderChanged = viewModel::setSortOrder,
@@ -266,6 +271,7 @@ fun LibraryScreen(
                     FavoritesContent(
                         favoriteSongs = uiState.favoriteSongs,
                         currentSongId = playbackState.currentSong?.id,
+                        isPlaying = playbackState.isPlaying,
                         favoriteSongIds = uiState.favoriteSongIds,
                         contentPadding = innerPadding,
                         onSongClick = { viewModel.playSong(it, uiState.favoriteSongs) },
@@ -507,6 +513,7 @@ private fun SearchBar(
 private fun SongList(
     songs: List<SongEntity>,
     currentSongId: Long?,
+    isPlaying: Boolean = false,
     favoriteSongIds: Set<Long>,
     sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
     onSortOrderChanged: (SongSortOrder) -> Unit = {},
@@ -637,9 +644,11 @@ private fun SongList(
         }
 
         items(items = songs, key = { it.id }) { song ->
+            val isCurrent = song.id == currentSongId
             SongItem(
                 song = song,
-                isCurrentPlaying = song.id == currentSongId,
+                isCurrentPlaying = isCurrent,
+                isPlaying = isCurrent && isPlaying,
                 isFavorite = favoriteSongIds.contains(song.id),
                 onClick = { onSongClick(song) },
                 onToggleFavorite = { onToggleFavorite(song.id) },
@@ -655,6 +664,7 @@ private fun SongList(
 private fun SongItem(
     song: SongEntity,
     isCurrentPlaying: Boolean,
+    isPlaying: Boolean,
     isFavorite: Boolean,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -670,110 +680,162 @@ private fun SongItem(
         MaterialTheme.colorScheme.onSurface
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    var isImageError by remember(song.albumArtUri) { mutableStateOf(false) }
+    val showPlaceholder = song.albumArtUri.isBlank() || isImageError
+
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCurrentPlaying) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            }
+        ),
+        border = if (isCurrentPlaying) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+        },
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isCurrentPlaying) 3.dp else 0.dp
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 3.dp)
     ) {
-        // Thumbnail Album Cover (Coil)
-        Box(
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(
-                    if (isCurrentPlaying) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            AsyncImage(
-                model = song.albumArtUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-            )
-            if (song.albumArtUri.isBlank()) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = if (isCurrentPlaying) MaterialTheme.colorScheme.onPrimaryContainer
-                           else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (isCurrentPlaying) FontWeight.Bold else FontWeight.Normal,
-                color = titleColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "${song.artist} • ${formatDuration(song.duration)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        // Tombol Cepat Favorit (Hati)
-        IconButton(onClick = onToggleFavorite) {
-            Icon(
-                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (isFavorite) "Hapus favorit" else "Tambah favorit",
-                tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-
-        // Tombol Menu Opsi
-        Box {
-            IconButton(onClick = { showMenu = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Menu Opsi",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
+            // Thumbnail Album Cover (Squircle 10.dp)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isCurrentPlaying) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
             ) {
-                DropdownMenuItem(
-                    text = { Text("Putar berikutnya") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
-                    onClick = {
-                        onPlayNext()
-                        showMenu = false
-                    }
+                if (!showPlaceholder) {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        onError = { isImageError = true },
+                        modifier = Modifier.matchParentSize()
+                    )
+                } else {
+                    AlbumArtPlaceholder(
+                        seed = song.title,
+                        modifier = Modifier.matchParentSize(),
+                        iconSize = 22.dp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isCurrentPlaying) FontWeight.Bold else FontWeight.Medium,
+                    color = titleColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                DropdownMenuItem(
-                    text = { Text("Tambah ke antrean") },
-                    leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    onClick = {
-                        onAddToQueue()
-                        showMenu = false
-                    }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${song.artist} • ${formatDuration(song.duration)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isCurrentPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                DropdownMenuItem(
-                    text = { Text("Tambah ke playlist") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
-                    onClick = {
-                        onAddToPlaylist()
-                        showMenu = false
-                    }
+            }
+
+            // Indikator Live Equalizer Berdenyut saat lagu sedang aktif diputar
+            if (isCurrentPlaying) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    LiveEqualizerIndicator(
+                        isPlaying = isPlaying,
+                        tint = MaterialTheme.colorScheme.primary,
+                        maxHeight = 14.dp,
+                        barWidth = 2.5.dp,
+                        spacing = 2.dp
+                    )
+                }
+            }
+
+            // Tombol Cepat Favorit (Hati)
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Hapus favorit" else "Tambah favorit",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
+            }
+
+            // Tombol Menu Opsi
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Menu Opsi",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Putar berikutnya") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
+                        onClick = {
+                            onPlayNext()
+                            showMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tambah ke antrean") },
+                        leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                        onClick = {
+                            onAddToQueue()
+                            showMenu = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tambah ke playlist") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                        onClick = {
+                            onAddToPlaylist()
+                            showMenu = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -785,6 +847,7 @@ private fun SongItem(
 private fun FavoritesContent(
     favoriteSongs: List<SongEntity>,
     currentSongId: Long?,
+    isPlaying: Boolean = false,
     favoriteSongIds: Set<Long>,
     contentPadding: PaddingValues,
     onSongClick: (SongEntity) -> Unit,
@@ -830,9 +893,11 @@ private fun FavoritesContent(
         }
 
         items(items = favoriteSongs, key = { it.id }) { song ->
+            val isCurrent = song.id == currentSongId
             SongItem(
                 song = song,
-                isCurrentPlaying = song.id == currentSongId,
+                isCurrentPlaying = isCurrent,
+                isPlaying = isCurrent && isPlaying,
                 isFavorite = favoriteSongIds.contains(song.id),
                 onClick = { onSongClick(song) },
                 onToggleFavorite = { onToggleFavorite(song.id) },
@@ -917,22 +982,23 @@ private fun PlaylistsContent(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 5.dp)
                         .clickable { onPlaylistClick(playlist) },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(14.dp)
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
                         ) {
                             Icon(
@@ -943,7 +1009,7 @@ private fun PlaylistsContent(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -965,7 +1031,8 @@ private fun PlaylistsContent(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Ganti Nama Playlist",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
@@ -973,7 +1040,8 @@ private fun PlaylistsContent(
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Hapus Playlist",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -1003,22 +1071,14 @@ private fun MiniPlayer(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
         tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shadowElevation = 10.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -1026,25 +1086,30 @@ private fun MiniPlayer(
                     .clickable(onClick = onClick)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
+                // Thumbnail Album Cover (Squircle 12.dp)
+                var isMiniError by remember(song.albumArtUri) { mutableStateOf(false) }
+                val showMiniPlaceholder = song.albumArtUri.isBlank() || isMiniError
+
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                 ) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize()
-                    )
-                    if (song.albumArtUri.isBlank()) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
+                    if (!showMiniPlaceholder) {
+                        AsyncImage(
+                            model = song.albumArtUri,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
+                            contentScale = ContentScale.Crop,
+                            onError = { isMiniError = true },
+                            modifier = Modifier.matchParentSize()
+                        )
+                    } else {
+                        AlbumArtPlaceholder(
+                            seed = song.title,
+                            modifier = Modifier.matchParentSize(),
+                            iconSize = 22.dp
                         )
                     }
                 }
@@ -1052,12 +1117,27 @@ private fun MiniPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = song.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        LiveEqualizerIndicator(
+                            isPlaying = playbackState.isPlaying,
+                            tint = MaterialTheme.colorScheme.primary,
+                            maxHeight = 12.dp,
+                            barWidth = 2.dp,
+                            spacing = 1.5.dp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = song.artist,
                         style = MaterialTheme.typography.bodySmall,
@@ -1067,28 +1147,56 @@ private fun MiniPlayer(
                     )
                 }
 
-                IconButton(onClick = onPrevClick) {
+                IconButton(
+                    onClick = onPrevClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Lagu Sebelumnya"
+                        contentDescription = "Lagu Sebelumnya",
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                IconButton(onClick = onPlayPauseClick) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    IconButton(
+                        onClick = onPlayPauseClick,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
-                IconButton(onClick = onNextClick) {
+                IconButton(
+                    onClick = onNextClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Lagu Berikutnya"
+                        contentDescription = "Lagu Berikutnya",
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
+
+            // Micro-progress bar di bagian bawah
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
         }
     }
 }

@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MusicNote
+import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.LiveEqualizerIndicator
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
@@ -187,9 +189,13 @@ fun PlaylistDetailSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                    else MaterialTheme.colorScheme.surface
+                                )
                                 .clickable { onPlayAll(songs, index) }
-                                .padding(vertical = 8.dp, horizontal = 4.dp)
+                                .padding(vertical = 8.dp, horizontal = 8.dp)
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
@@ -198,18 +204,18 @@ fun PlaylistDetailSheet(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                AsyncImage(
-                                    model = song.albumArtUri,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.matchParentSize()
-                                )
-                                if (song.albumArtUri.isBlank()) {
-                                    Icon(
-                                        imageVector = Icons.Default.MusicNote,
+                                if (song.albumArtUri.isNotBlank()) {
+                                    AsyncImage(
+                                        model = song.albumArtUri,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.matchParentSize()
+                                    )
+                                } else {
+                                    AlbumArtPlaceholder(
+                                        seed = song.title,
+                                        modifier = Modifier.matchParentSize(),
+                                        iconSize = 20.dp
                                     )
                                 }
                             }
@@ -232,6 +238,24 @@ fun PlaylistDetailSheet(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                            }
+
+                            if (isPlaying) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 6.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                ) {
+                                    LiveEqualizerIndicator(
+                                        isPlaying = true,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        maxHeight = 14.dp,
+                                        barWidth = 2.5.dp,
+                                        spacing = 2.dp
+                                    )
+                                }
                             }
 
                             IconButton(onClick = { onRemoveSong(song.id) }) {

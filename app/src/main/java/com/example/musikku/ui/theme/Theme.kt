@@ -1,6 +1,5 @@
 package com.example.musikku.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,40 +8,60 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import com.example.musikku.data.preferences.ThemeMode
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80,
-    background = Color(0xFF141218),
-    surface = Color(0xFF141218),
-    surfaceVariant = Color(0xFF26222D),
-    onPrimary = Color(0xFF381E72),
-    onBackground = Color(0xFFE6E1E5),
-    onSurface = Color(0xFFE6E1E5)
+    primary = NeonEmerald,
+    onPrimary = EmeraldDark,
+    primaryContainer = EmeraldContainer,
+    onPrimaryContainer = OnEmeraldContainer,
+    secondary = EmeraldMint,
+    onSecondary = EmeraldDark,
+    secondaryContainer = Color(0xFF142F1F),
+    onSecondaryContainer = EmeraldMint,
+    tertiary = EmeraldSpotify,
+    onTertiary = EmeraldDark,
+    background = AmoledBlack,
+    onBackground = TextWhite,
+    surface = MidnightDark,
+    onSurface = TextWhite,
+    surfaceVariant = MidnightCard,
+    onSurfaceVariant = TextMuted,
+    surfaceContainerHigh = MidnightCardHigh,
+    outline = MidnightBorder,
+    outlineVariant = Color(0xFF1B2820),
+    error = ErrorRed,
+    onError = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40,
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    surfaceVariant = Color(0xFFF1EDF6),
+    primary = EmeraldLightPrimary,
     onPrimary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F)
+    primaryContainer = Color(0xFFCEF6DB),
+    onPrimaryContainer = Color(0xFF00210E),
+    secondary = Color(0xFF286643),
+    onSecondaryContainer = Color(0xFF072111),
+    secondaryContainer = Color(0xFFD4EBDC),
+    tertiary = EmeraldSpotify,
+    background = EmeraldLightBg,
+    onBackground = TextLightPrimary,
+    surface = EmeraldLightSurface,
+    onSurface = TextLightPrimary,
+    surfaceVariant = EmeraldLightSurfaceVariant,
+    onSurfaceVariant = TextLightSecondary,
+    surfaceContainerHigh = EmeraldLightCardHigh,
+    outline = EmeraldLightBorder,
+    outlineVariant = Color(0xFFD8E4DC),
+    error = Color(0xFFBA1A1A),
+    onError = Color.White
 )
 
 @Composable
 fun MusikKuTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -56,7 +75,6 @@ fun MusikKuTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

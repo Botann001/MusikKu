@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.musikku.ui.common.AlbumArtPlaceholder
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -343,19 +344,18 @@ private fun JamendoTrackRow(
                 )
         ) {
             val artUrl = track.albumImage ?: track.image
-            AsyncImage(
-                model = artUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-            )
-            if (artUrl.isNullOrBlank()) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
+            if (!artUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = artUrl,
                     contentDescription = null,
-                    tint = if (isPlaying) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else {
+                AlbumArtPlaceholder(
+                    seed = track.name,
+                    modifier = Modifier.matchParentSize(),
+                    iconSize = 22.dp
                 )
             }
         }
