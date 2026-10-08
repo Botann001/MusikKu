@@ -43,6 +43,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Proteksi Anti-Spyware: Cegah serangan Tapjacking melalui overlay berbahaya
+        window.decorView.filterTouchesWhenObscured = true
+
         checkAndRequestPermissions()
 
         setContent {

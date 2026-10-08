@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.example.musikku.appContainer
 import com.example.musikku.data.local.entity.SongEntity
+import com.example.musikku.security.SecurityGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -71,6 +72,13 @@ class DownloadSongWorker(
             val safeFileName = title.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
             val targetFile = File(musicDir, "${safeFileName}_$songId.mp3")
 
+            // Proteksi Path Traversal: Cegah penulisan di luar folder unduhan
+            if (!SecurityGuard.validateSafeFilePath(musicDir, targetFile)) {
+                return@withContext Result.failure(
+                    workDataOf("error" to "Peringatan Keamanan: Terdeteksi percobaan manipulasi path file.")
+                )
+            }
+
             // Unduh stream audio HTTP
             val url = URL(downloadUrl)
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -116,6 +124,20 @@ class DownloadSongWorker(
             }
 
             setProgress(workDataOf(KEY_PROGRESS to 100))
+
+            // Proteksi Anti-Malware & Anti-Ransomware: Validasi Magic Bytes berkas audio
+            val audioValidation = SecurityGuard.validateAudioMagicBytes(targetFile)
+            if (audioValidation == SecurityGuard.AudioValidationResult.MALICIOUS_EXECUTABLE) {
+                targetFile.delete()
+                return@withContext Result.failure(
+                    workDataOf("error" to "Berkas terdeteksi sebagai muatan berbahaya (Malware) dan telah dimusnahkan.")
+                )
+            } else if (audioValidation == SecurityGuard.AudioValidationResult.CORRUPTED_OR_EMPTY) {
+                targetFile.delete()
+                return@withContext Result.failure(
+                    workDataOf("error" to "Berkas audio rusak atau korup.")
+                )
+            }
 
             // Simpan entri file yang berhasil diunduh ke Room lokal melalui AppContainer database
             val database = context.appContainer.database

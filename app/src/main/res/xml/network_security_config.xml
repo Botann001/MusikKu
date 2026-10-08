@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Blokir seluruh koneksi tidak terenkripsi (cleartext HTTP) untuk mencegah Spyware & MITM Sniffing -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Hanya percaya pada sertifikat CA sistem Android resmi (menolak sertifikat root palsu dari spyware/proxy) -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Konfigurasi domain Jamendo API dan CDN resmi -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">jamendo.com</domain>
+        <domain includeSubdomains="true">api.jamendo.com</domain>
+        <domain includeSubdomains="true">usercontent.jamendo.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
