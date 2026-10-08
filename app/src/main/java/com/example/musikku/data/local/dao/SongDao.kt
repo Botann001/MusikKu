@@ -72,4 +72,8 @@ interface SongDao {
     /** Update URI cover album lagu. */
     @Query("UPDATE songs SET albumArtUri = :albumArtUri WHERE id = :songId")
     suspend fun updateAlbumArt(songId: Long, albumArtUri: String)
+
+    /** Hapus file audio obrolan seperti WhatsApp yang sebelumnya tersimpan */
+    @Query("DELETE FROM songs WHERE source = 'LOCAL' AND (title LIKE 'AUD-%-WA%' OR title LIKE 'PTT-%-WA%' OR title LIKE 'AUD-%' OR title LIKE 'PTT-%' OR (filePath IS NOT NULL AND (filePath LIKE '%WhatsApp%' OR filePath LIKE '%Telegram%')))")
+    suspend fun deleteWhatsAppAudios()
 }

@@ -42,6 +42,7 @@ class LibraryViewModel(
     private val _selectedTab = MutableStateFlow(LibraryTab.SONGS)
     private val _isLoading = MutableStateFlow(true)
     private val _jamendoState = MutableStateFlow(JamendoSearchState())
+    private val _sortOrder = MutableStateFlow(SongSortOrder.TITLE_AZ)
 
     private val songsFlow = _searchQuery.flatMapLatest { query ->
         if (query.isBlank()) repository.allSongs
@@ -70,6 +71,7 @@ class LibraryViewModel(
         val tab: LibraryTab,
         val query: String,
         val jamendoState: JamendoSearchState,
+        val sortOrder: SongSortOrder,
         val isLoading: Boolean,
         val isOnline: Boolean,
         val downloadOnlyWifi: Boolean,
@@ -77,18 +79,19 @@ class LibraryViewModel(
     )
 
     private val tabQueryFlow = combine(
-        combine(_selectedTab, _searchQuery, _jamendoState) { tab, q, jamendo ->
-            Triple(tab, q, jamendo)
+        combine(_selectedTab, _searchQuery, _jamendoState, _sortOrder) { tab, q, jamendo, sort ->
+            listOf(tab, q, jamendo, sort)
         },
         combine(_isLoading, networkMonitor.isOnline, settingsRepository.downloadOnlyWifi, settingsRepository.themeMode) { loading, online, wifiOnly, theme ->
             listOf(loading, online, wifiOnly, theme)
         }
-    ) { (tab, query, jamendo), settingsList ->
+    ) { leftList, settingsList ->
         @Suppress("UNCHECKED_CAST")
         CombinedTabState(
-            tab = tab,
-            query = query,
-            jamendoState = jamendo,
+            tab = leftList[0] as LibraryTab,
+            query = leftList[1] as String,
+            jamendoState = leftList[2] as JamendoSearchState,
+            sortOrder = leftList[3] as SongSortOrder,
             isLoading = settingsList[0] as Boolean,
             isOnline = settingsList[1] as Boolean,
             downloadOnlyWifi = settingsList[2] as Boolean,
@@ -100,8 +103,15 @@ class LibraryViewModel(
         repositoryDataFlow,
         tabQueryFlow
     ) { repoData, tabState ->
+        val sortedSongs = when (tabState.sortOrder) {
+            SongSortOrder.TITLE_AZ -> repoData.songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+            SongSortOrder.DATE_ADDED -> repoData.songs.sortedByDescending { it.dateAdded }
+            SongSortOrder.TITLE_ZA -> repoData.songs.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
+            SongSortOrder.ARTIST -> repoData.songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist })
+        }
+
         LibraryUiState(
-            songs = repoData.songs,
+            songs = sortedSongs,
             favoriteSongs = repoData.favoriteSongs,
             favoriteSongIds = repoData.favoriteSongIds,
             playlists = repoData.playlists,
@@ -111,9 +121,10 @@ class LibraryViewModel(
             isOnline = tabState.isOnline,
             downloadOnlyWifi = tabState.downloadOnlyWifi,
             themeMode = tabState.themeMode,
+            sortOrder = tabState.sortOrder,
             isLoading = tabState.isLoading,
             isEmpty = !tabState.isLoading && when (tabState.tab) {
-                LibraryTab.SONGS -> repoData.songs.isEmpty()
+                LibraryTab.SONGS -> sortedSongs.isEmpty()
                 LibraryTab.FAVORITES -> repoData.favoriteSongs.isEmpty()
                 LibraryTab.PLAYLISTS -> repoData.playlists.isEmpty()
                 LibraryTab.JAMENDO -> tabState.jamendoState.results.isEmpty() &&
@@ -153,6 +164,10 @@ class LibraryViewModel(
 
     fun selectTab(tab: LibraryTab) {
         _selectedTab.update { tab }
+    }
+
+    fun setSortOrder(order: SongSortOrder) {
+        _sortOrder.update { order }
     }
 
     fun onSearchQueryChanged(query: String) {

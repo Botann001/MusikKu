@@ -12,6 +12,13 @@ enum class LibraryTab {
     JAMENDO
 }
 
+enum class SongSortOrder(val label: String) {
+    TITLE_AZ("Sesuai A-Z"),
+    DATE_ADDED("Baru Ditambah"),
+    TITLE_ZA("Nama (Z-A)"),
+    ARTIST("Artis")
+}
+
 data class JamendoSearchState(
     val query: String = "",
     val results: List<JamendoTrackDto> = emptyList(),
@@ -35,6 +42,7 @@ data class LibraryUiState(
     val isOnline: Boolean = true,
     val downloadOnlyWifi: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
     val isLoading: Boolean = true,
     val isEmpty: Boolean = false
 )

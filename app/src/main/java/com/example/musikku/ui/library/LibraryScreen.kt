@@ -57,6 +57,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -243,6 +247,8 @@ fun LibraryScreen(
                         songs = uiState.songs,
                         currentSongId = playbackState.currentSong?.id,
                         favoriteSongIds = uiState.favoriteSongIds,
+                        sortOrder = uiState.sortOrder,
+                        onSortOrderChanged = viewModel::setSortOrder,
                         contentPadding = innerPadding,
                         onSongClick = onSongClick,
                         onToggleFavorite = viewModel::toggleFavorite,
@@ -502,6 +508,8 @@ private fun SongList(
     songs: List<SongEntity>,
     currentSongId: Long?,
     favoriteSongIds: Set<Long>,
+    sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
+    onSortOrderChanged: (SongSortOrder) -> Unit = {},
     contentPadding: PaddingValues,
     onSongClick: (SongEntity) -> Unit,
     onToggleFavorite: (Long) -> Unit,
@@ -513,6 +521,121 @@ private fun SongList(
         contentPadding = contentPadding,
         modifier = Modifier.fillMaxSize()
     ) {
+        // Baris Header: Jumlah lagu dan Pilihan Urutan (A-Z, Baru Ditambah, dll.)
+        item(key = "sort_header") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${songs.size} Lagu",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = sortOrder == SongSortOrder.TITLE_AZ,
+                        onClick = { onSortOrderChanged(SongSortOrder.TITLE_AZ) },
+                        label = { Text("A-Z") },
+                        leadingIcon = if (sortOrder == SongSortOrder.TITLE_AZ) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else null
+                    )
+
+                    FilterChip(
+                        selected = sortOrder == SongSortOrder.DATE_ADDED,
+                        onClick = { onSortOrderChanged(SongSortOrder.DATE_ADDED) },
+                        label = { Text("Baru Ditambah") },
+                        leadingIcon = if (sortOrder == SongSortOrder.DATE_ADDED) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else null
+                    )
+
+                    var showSortMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(
+                            onClick = { showSortMenu = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sort,
+                                contentDescription = "Pilihan Urutan Lainnya",
+                                tint = if (sortOrder == SongSortOrder.TITLE_ZA || sortOrder == SongSortOrder.ARTIST)
+                                    MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Nama (A-Z)") },
+                                onClick = {
+                                    onSortOrderChanged(SongSortOrder.TITLE_AZ)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sortOrder == SongSortOrder.TITLE_AZ) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Nama (Z-A)") },
+                                onClick = {
+                                    onSortOrderChanged(SongSortOrder.TITLE_ZA)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sortOrder == SongSortOrder.TITLE_ZA) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Baru Ditambah") },
+                                onClick = {
+                                    onSortOrderChanged(SongSortOrder.DATE_ADDED)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sortOrder == SongSortOrder.DATE_ADDED) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Artis") },
+                                onClick = {
+                                    onSortOrderChanged(SongSortOrder.ARTIST)
+                                    showSortMenu = false
+                                },
+                                leadingIcon = if (sortOrder == SongSortOrder.ARTIST) {
+                                    { Icon(Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         items(items = songs, key = { it.id }) { song ->
             SongItem(
                 song = song,

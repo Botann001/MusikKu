@@ -37,6 +37,9 @@ class MusicRepository(
      * Dijalankan di Dispatchers.IO karena query MediaStore bisa lambat.
      */
     suspend fun refreshFromDevice() = withContext(Dispatchers.IO) {
+        // Hapus audio obrolan / WhatsApp yang sebelumnya sempat tersimpan
+        songDao.deleteWhatsAppAudios()
+
         val scanned = musicScanner.scanAll()
         // Ambil daftar favorit dan custom album art yang ada agar tidak terhapus saat rescan
         val currentFavIds = songDao.getFavoriteSongIds().first().toSet()
