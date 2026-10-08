@@ -38,15 +38,26 @@ class MusicRepository(
      */
     suspend fun refreshFromDevice() = withContext(Dispatchers.IO) {
         val scanned = musicScanner.scanAll()
-        // Ambil daftar favorit yang ada agar flag isFavorite pada lagu lokal tidak terhapus saat rescan
+        // Ambil daftar favorit dan custom album art yang ada agar tidak terhapus saat rescan
         val currentFavIds = songDao.getFavoriteSongIds().first().toSet()
+        val existingSongs = songDao.getAllSongs().first().associateBy { it.id }
         val songsToInsert = scanned.map { song ->
-            if (currentFavIds.contains(song.id)) song.copy(isFavorite = true) else song
+            val existing = existingSongs[song.id]
+            var updated = if (currentFavIds.contains(song.id)) song.copy(isFavorite = true) else song
+            if (existing != null && existing.albumArtUri.startsWith("file://")) {
+                updated = updated.copy(albumArtUri = existing.albumArtUri)
+            }
+            updated
         }
         songDao.insertAll(songsToInsert)
         // Hapus baris lama yang file-nya sudah dihapus user
         val validIds = scanned.map { it.id }
         songDao.deleteStale(validIds)
+    }
+
+    /** Update URI album cover lagu di database. */
+    suspend fun updateSongAlbumArt(songId: Long, albumArtUri: String) = withContext(Dispatchers.IO) {
+        songDao.updateAlbumArt(songId, albumArtUri)
     }
 
     // ─── Favorit ────────────────────────────────────────────────────────────────

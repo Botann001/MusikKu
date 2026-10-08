@@ -20,6 +20,7 @@
 3. **Antarmuka Pemutar Interaktif (Tahap 3)**
    - **Mini Player**: Tampil mengambang di atas navigasi bawah saat lagu aktif dengan tombol play/pause dan progress.
    - **Now Playing Sheet**: Tampilan layar penuh dengan cover art besar, seekbar interaktif, repeat (off/all/one), shuffle, dan tombol favorit.
+   - **Kustomisasi Album Cover**: Dukungan menambah atau mengganti sampul album langsung dari Galeri perangkat (Photo Picker) dan menyimpannya secara permanen ke Room Database.
    - **Antrean Pemutaran (Queue)**: Lihat daftar lagu aktif, hapus antrean, atau seret untuk mengubah urutan pemutaran.
 
 4. **Playlist & Favorit dengan Room (Tahap 4)**

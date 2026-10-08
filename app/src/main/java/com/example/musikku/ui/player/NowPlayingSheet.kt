@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -58,8 +59,18 @@ import coil.compose.AsyncImage
 import com.example.musikku.playback.PlaybackState
 
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,12 +89,24 @@ fun NowPlayingSheet(
     onRemoveQueueItem: (Int) -> Unit,
     onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onSetSleepTimer: (Int) -> Unit = {},
-    onCancelSleepTimer: () -> Unit = {}
+    onCancelSleepTimer: () -> Unit = {},
+    onUpdateAlbumCover: (Long, Uri) -> Unit = { _, _ -> },
+    onRemoveAlbumCover: (Long) -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showQueue by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showCoverOptionsDialog by remember { mutableStateOf(false) }
+    var isImageError by remember(song.albumArtUri) { mutableStateOf(false) }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onUpdateAlbumCover(song.id, uri)
+        }
+    }
 
     // State untuk dragging slider agar waktu tidak melompat ketika digeser oleh jari pengguna
     var isDraggingSlider by remember { mutableStateOf(false) }
@@ -156,6 +179,9 @@ fun NowPlayingSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             // ─── Artwork Cover ──────────────────────────────────────────────────────
+            val hasCustomCover = song.albumArtUri.startsWith("file://")
+            val isBlankOrError = song.albumArtUri.isBlank() || isImageError
+
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -164,20 +190,90 @@ fun NowPlayingSheet(
                     .shadow(16.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable {
+                        if (hasCustomCover) {
+                            showCoverOptionsDialog = true
+                        } else {
+                            pickImageLauncher.launch("image/*")
+                        }
+                    }
             ) {
-                AsyncImage(
-                    model = song.albumArtUri,
-                    contentDescription = "Cover Album ${song.album}",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                if (song.albumArtUri.isBlank()) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(96.dp)
+                if (!isBlankOrError) {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = "Cover Album ${song.album}",
+                        contentScale = ContentScale.Crop,
+                        onError = { isImageError = true },
+                        onSuccess = { isImageError = false },
+                        modifier = Modifier.fillMaxSize()
                     )
+
+                    // Tombol edit cover melayang di pojok kanan bawah
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(12.dp)
+                            .size(42.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (hasCustomCover) {
+                                    showCoverOptionsDialog = true
+                                } else {
+                                    pickImageLauncher.launch("image/*")
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Ubah Cover Album",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                } else {
+                    // Fallback interaktif jika belum ada cover atau gambar gagal dimuat
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.size(76.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = "Tambah Cover Album",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(38.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Tambah Cover Album",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Ketuk untuk memilih foto dari galeri",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
@@ -346,6 +442,40 @@ fun NowPlayingSheet(
             },
             onRemoveQueueItem = onRemoveQueueItem,
             onMoveQueueItem = onMoveQueueItem
+        )
+    }
+
+    // Dialog Opsi Sampul Album Kustom
+    if (showCoverOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showCoverOptionsDialog = false },
+            title = { Text("Sampul Album") },
+            text = { Text("Pilih tindakan untuk sampul album lagu '${song.title}':") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCoverOptionsDialog = false
+                    pickImageLauncher.launch("image/*")
+                }) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Ganti Foto")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        showCoverOptionsDialog = false
+                        onRemoveAlbumCover(song.id)
+                    }) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Hapus", color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = { showCoverOptionsDialog = false }) {
+                        Text("Batal")
+                    }
+                }
+            }
         )
     }
 

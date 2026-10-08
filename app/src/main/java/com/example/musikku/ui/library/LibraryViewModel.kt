@@ -22,7 +22,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.content.Context
+import android.net.Uri
+import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(
@@ -394,6 +399,38 @@ class LibraryViewModel(
 
     fun toggleRepeatMode() {
         musicController.toggleRepeatMode()
+    }
+
+    /** Simpan file cover baru ke penyimpanan aplikasi dan update database & pemutar. */
+    fun updateAlbumCover(songId: Long, uri: Uri, context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val coversDir = File(context.filesDir, "album_covers").apply { mkdirs() }
+                val destFile = File(coversDir, "cover_${songId}_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                val newArtUri = Uri.fromFile(destFile).toString()
+                repository.updateSongAlbumArt(songId, newArtUri)
+                musicController.updateSongArtwork(songId, newArtUri)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /** Hapus cover kustom dan kembalikan ke default. */
+    fun removeCustomAlbumCover(songId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.updateSongAlbumArt(songId, "")
+                musicController.updateSongArtwork(songId, "")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     /** Factory manual AppContainer tanpa Hilt. */

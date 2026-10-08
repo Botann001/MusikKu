@@ -386,7 +386,13 @@ fun LibraryScreen(
             onRemoveQueueItem = viewModel::removeQueueItem,
             onMoveQueueItem = viewModel::moveQueueItem,
             onSetSleepTimer = viewModel::setSleepTimer,
-            onCancelSleepTimer = viewModel::cancelSleepTimer
+            onCancelSleepTimer = viewModel::cancelSleepTimer,
+            onUpdateAlbumCover = { songId, uri ->
+                viewModel.updateAlbumCover(songId, uri, context)
+            },
+            onRemoveAlbumCover = { songId ->
+                viewModel.removeCustomAlbumCover(songId)
+            }
         )
     }
 }

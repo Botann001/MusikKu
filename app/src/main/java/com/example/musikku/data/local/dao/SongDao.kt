@@ -68,4 +68,8 @@ interface SongDao {
     /** Cek status favorit lagu. */
     @Query("SELECT isFavorite FROM songs WHERE id = :songId")
     fun isFavorite(songId: Long): Flow<Boolean?>
+
+    /** Update URI cover album lagu. */
+    @Query("UPDATE songs SET albumArtUri = :albumArtUri WHERE id = :songId")
+    suspend fun updateAlbumArt(songId: Long, albumArtUri: String)
 }

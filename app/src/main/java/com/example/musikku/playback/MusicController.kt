@@ -444,6 +444,24 @@ class MusicController(private val context: Context) {
         return true
     }
 
+    /** Update cover album untuk lagu yang sedang aktif maupun di antrean. */
+    fun updateSongArtwork(songId: Long, newAlbumArtUri: String) {
+        currentPlaylist = currentPlaylist.map {
+            if (it.id == songId) it.copy(albumArtUri = newAlbumArtUri) else it
+        }
+        _playbackState.update { state ->
+            val updatedSong = if (state.currentSong?.id == songId) {
+                state.currentSong.copy(albumArtUri = newAlbumArtUri)
+            } else {
+                state.currentSong
+            }
+            state.copy(
+                currentSong = updatedSong,
+                queue = currentPlaylist
+            )
+        }
+    }
+
     fun release() {
         sleepTimerJob?.cancel()
         progressJob?.cancel()
