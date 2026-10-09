@@ -61,6 +61,10 @@ class MusicController(private val context: Context) {
     private val _userMessageEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val userMessageEvent: SharedFlow<String> = _userMessageEvent.asSharedFlow()
 
+    fun postUserMessage(message: String) {
+        _userMessageEvent.tryEmit(message)
+    }
+
     private var currentPlaylist: List<SongEntity> = emptyList()
     private var progressJob: Job? = null
     private var sleepTimerJob: Job? = null

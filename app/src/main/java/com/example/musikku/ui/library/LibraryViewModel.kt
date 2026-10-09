@@ -33,6 +33,7 @@ import java.io.FileOutputStream
 class LibraryViewModel(
     private val repository: MusicRepository,
     val jamendoRepository: JamendoRepository,
+    val youTubeMusicRepository: com.example.musikku.data.repository.YouTubeMusicRepository,
     val settingsRepository: SettingsRepository,
     val networkMonitor: NetworkMonitor,
     val musicController: MusicController
@@ -41,6 +42,8 @@ class LibraryViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _selectedTab = MutableStateFlow(LibraryTab.SONGS)
     private val _isLoading = MutableStateFlow(true)
+    private val _exploreSourceTab = MutableStateFlow(ExploreSourceTab.YOUTUBE)
+    private val _youTubeState = MutableStateFlow(YouTubeSearchState())
     private val _jamendoState = MutableStateFlow(JamendoSearchState())
     private val _sortOrder = MutableStateFlow(SongSortOrder.TITLE_AZ)
 
@@ -70,6 +73,8 @@ class LibraryViewModel(
     private data class CombinedTabState(
         val tab: LibraryTab,
         val query: String,
+        val exploreSourceTab: ExploreSourceTab,
+        val youTubeState: YouTubeSearchState,
         val jamendoState: JamendoSearchState,
         val sortOrder: SongSortOrder,
         val isLoading: Boolean,
@@ -79,23 +84,28 @@ class LibraryViewModel(
     )
 
     private val tabQueryFlow = combine(
-        combine(_selectedTab, _searchQuery, _jamendoState, _sortOrder) { tab, q, jamendo, sort ->
-            listOf(tab, q, jamendo, sort)
+        combine(_selectedTab, _searchQuery, _exploreSourceTab, _youTubeState) { tab, q, expTab, ytState ->
+            listOf(tab, q, expTab, ytState)
         },
-        combine(_isLoading, networkMonitor.isOnline, settingsRepository.downloadOnlyWifi, settingsRepository.themeMode) { loading, online, wifiOnly, theme ->
-            listOf(loading, online, wifiOnly, theme)
+        combine(_jamendoState, _sortOrder, _isLoading) { jamendo, sort, loading ->
+            listOf(jamendo, sort, loading)
+        },
+        combine(networkMonitor.isOnline, settingsRepository.downloadOnlyWifi, settingsRepository.themeMode) { online, wifiOnly, theme ->
+            listOf(online, wifiOnly, theme)
         }
-    ) { leftList, settingsList ->
+    ) { list1, list2, list3 ->
         @Suppress("UNCHECKED_CAST")
         CombinedTabState(
-            tab = leftList[0] as LibraryTab,
-            query = leftList[1] as String,
-            jamendoState = leftList[2] as JamendoSearchState,
-            sortOrder = leftList[3] as SongSortOrder,
-            isLoading = settingsList[0] as Boolean,
-            isOnline = settingsList[1] as Boolean,
-            downloadOnlyWifi = settingsList[2] as Boolean,
-            themeMode = settingsList[3] as ThemeMode
+            tab = list1[0] as LibraryTab,
+            query = list1[1] as String,
+            exploreSourceTab = list1[2] as ExploreSourceTab,
+            youTubeState = list1[3] as YouTubeSearchState,
+            jamendoState = list2[0] as JamendoSearchState,
+            sortOrder = list2[1] as SongSortOrder,
+            isLoading = list2[2] as Boolean,
+            isOnline = list3[0] as Boolean,
+            downloadOnlyWifi = list3[1] as Boolean,
+            themeMode = list3[2] as ThemeMode
         )
     }
 
@@ -117,6 +127,8 @@ class LibraryViewModel(
             playlists = repoData.playlists,
             selectedTab = tabState.tab,
             searchQuery = tabState.query,
+            exploreSourceTab = tabState.exploreSourceTab,
+            youTubeState = tabState.youTubeState,
             jamendoState = tabState.jamendoState,
             isOnline = tabState.isOnline,
             downloadOnlyWifi = tabState.downloadOnlyWifi,
@@ -158,8 +170,9 @@ class LibraryViewModel(
             }
         }
 
-        // Muat lagu populer awal untuk Jamendo
+        // Muat lagu populer awal untuk Jamendo dan YouTube Music
         loadPopularJamendo()
+        loadTrendingYouTube()
     }
 
     fun selectTab(tab: LibraryTab) {
@@ -243,6 +256,109 @@ class LibraryViewModel(
                         errorMessage = "Gagal memuat: ${error.localizedMessage ?: "Koneksi internet bermasalah"}"
                     )
                 }
+            }
+        }
+    }
+
+    // ─── Operasi YouTube Music ─────────────────────────────────────────────────
+
+    fun setExploreSourceTab(tab: ExploreSourceTab) {
+        _exploreSourceTab.update { tab }
+    }
+
+    fun loadTrendingYouTube() {
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(isSearching = true, errorMessage = null) }
+            val result = youTubeMusicRepository.getTrendingMusic()
+            result.onSuccess { tracks ->
+                android.util.Log.d("MusikKuYouTube", "Loaded trending tracks: ${tracks.size}")
+                _youTubeState.update {
+                    it.copy(
+                        trendingTracks = tracks,
+                        isSearching = false,
+                        errorMessage = null
+                    )
+                }
+            }.onFailure { error ->
+                android.util.Log.e("MusikKuYouTube", "Failed to load trending", error)
+                _youTubeState.update {
+                    it.copy(
+                        isSearching = false,
+                        errorMessage = "Gagal memuat musik trending: ${error.localizedMessage ?: "Periksa koneksi internet"}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun searchYouTube(query: String) {
+        val queryClean = query.trim()
+        if (queryClean.isBlank()) {
+            loadTrendingYouTube()
+            return
+        }
+
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(query = queryClean, isSearching = true, errorMessage = null) }
+            val result = youTubeMusicRepository.searchMusic(queryClean)
+            result.onSuccess { tracks ->
+                android.util.Log.d("MusikKuYouTube", "Search for '$queryClean' returned: ${tracks.size} tracks")
+                _youTubeState.update {
+                    it.copy(
+                        results = tracks,
+                        isSearching = false,
+                        errorMessage = if (tracks.isEmpty()) "Tidak ada hasil untuk \"$queryClean\"" else null
+                    )
+                }
+            }.onFailure { error ->
+                android.util.Log.e("MusikKuYouTube", "Search for '$queryClean' failed", error)
+                _youTubeState.update {
+                    it.copy(
+                        isSearching = false,
+                        errorMessage = "Gagal mencari di YouTube: ${error.localizedMessage ?: "Periksa koneksi internet"}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun playYouTubeTrack(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto) {
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(isLoadingStreamId = track.videoId) }
+            val result = youTubeMusicRepository.resolveAudioStream(track)
+            _youTubeState.update { it.copy(isLoadingStreamId = null) }
+            result.onSuccess { song ->
+                musicController.playSongs(listOf(song), 0)
+            }.onFailure { error ->
+                musicController.postUserMessage("Gagal memutar audio YouTube: ${error.localizedMessage ?: "Format tidak didukung"}")
+            }
+        }
+    }
+
+    fun addYouTubeTrackToQueue(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto) {
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(isLoadingStreamId = track.videoId) }
+            val result = youTubeMusicRepository.resolveAudioStream(track)
+            _youTubeState.update { it.copy(isLoadingStreamId = null) }
+            result.onSuccess { song ->
+                musicController.addToQueue(song)
+                musicController.postUserMessage("Ditambahkan ke antrean: ${song.title}")
+            }.onFailure { error ->
+                musicController.postUserMessage("Gagal menambahkan ke antrean: ${error.localizedMessage}")
+            }
+        }
+    }
+
+    fun addYouTubeTrackToPlaylist(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto, playlistId: Long) {
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(isLoadingStreamId = track.videoId) }
+            val result = youTubeMusicRepository.resolveAudioStream(track)
+            _youTubeState.update { it.copy(isLoadingStreamId = null) }
+            result.onSuccess { song ->
+                repository.addSongToPlaylist(playlistId, song.id)
+                musicController.postUserMessage("Lagu YouTube ditambahkan ke playlist")
+            }.onFailure { error ->
+                musicController.postUserMessage("Gagal menambahkan ke playlist: ${error.localizedMessage}")
             }
         }
     }
@@ -475,6 +591,7 @@ class LibraryViewModel(
     class Factory(
         private val repository: MusicRepository,
         private val jamendoRepository: JamendoRepository,
+        private val youTubeMusicRepository: com.example.musikku.data.repository.YouTubeMusicRepository,
         private val settingsRepository: SettingsRepository,
         private val networkMonitor: NetworkMonitor,
         private val musicController: MusicController
@@ -484,6 +601,7 @@ class LibraryViewModel(
             return LibraryViewModel(
                 repository = repository,
                 jamendoRepository = jamendoRepository,
+                youTubeMusicRepository = youTubeMusicRepository,
                 settingsRepository = settingsRepository,
                 networkMonitor = networkMonitor,
                 musicController = musicController

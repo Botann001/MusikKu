@@ -79,6 +79,7 @@ fun JamendoContent(
     isOnline: Boolean,
     downloadOnlyWifi: Boolean,
     contentPadding: PaddingValues,
+    showHeader: Boolean = true,
     onSearch: (String) -> Unit,
     onStream: (JamendoTrackDto) -> Unit,
     onDownload: (JamendoTrackDto) -> Unit,
@@ -94,30 +95,32 @@ fun JamendoContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
+            .then(if (showHeader) Modifier.statusBarsPadding() else Modifier)
             .padding(contentPadding)
     ) {
         // ─── 1. Header (MUSIK LEGAL DARI JAMENDO & Jelajah) Sesuai Image 3 ───────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = "MUSIK LEGAL DARI JAMENDO",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 1.8.sp
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "Jelajah",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                fontSize = 34.sp
-            )
+        if (showHeader) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "MUSIK LEGAL DARI JAMENDO",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMuted,
+                    letterSpacing = 1.8.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Jelajah",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    fontSize = 34.sp
+                )
+            }
         }
 
         // ─── 2. Search Bar Kapsul (Cari jutaan lagu gratis) ──────────────────────

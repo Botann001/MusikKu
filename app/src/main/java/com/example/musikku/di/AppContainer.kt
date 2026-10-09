@@ -55,9 +55,22 @@ class AppContainer(context: Context) {
     /** Alias playerController sesuai kontrak spesifikasi */
     val playerController: MusicController get() = musicController
 
+    // Konfigurasi OkHttpClient dengan User-Agent untuk akses streaming dan API
+    private val okHttpClient = okhttp3.OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .build()
+            chain.proceed(request)
+        }
+        .build()
+
     // Konfigurasi Retrofit untuk Jamendo API
     private val retrofit = Retrofit.Builder()
         .baseUrl(JamendoApiService.BASE_URL)
+        .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
@@ -69,5 +82,19 @@ class AppContainer(context: Context) {
         songDao = database.songDao(),
         settingsRepository = settingsRepository,
         clientId = com.example.musikku.BuildConfig.JAMENDO_CLIENT_ID
+    )
+
+    // Konfigurasi Retrofit untuk Invidious / YouTube Music API
+    val youTubeApiService: com.example.musikku.data.remote.youtube.YouTubeApiService = Retrofit.Builder()
+        .baseUrl("https://invidious.f5.si/")
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(com.example.musikku.data.remote.youtube.YouTubeApiService::class.java)
+
+    val youTubeMusicRepository = com.example.musikku.data.repository.YouTubeMusicRepository(
+        context = context.applicationContext,
+        apiService = youTubeApiService,
+        songDao = database.songDao()
     )
 }

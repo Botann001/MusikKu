@@ -187,7 +187,8 @@ fun NowPlayingSheet(
                         letterSpacing = 1.5.sp
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val sourceText = if (song.source == "JAMENDO") "Jelajah · Jamendo"
+                    val sourceText = if (song.source == "YOUTUBE") "Jelajah · YouTube Music"
+                                     else if (song.source == "JAMENDO") "Jelajah · Jamendo"
                                      else if (song.source == "DOWNLOADED") "Library · Terunduh"
                                      else "Library · Semua Lagu"
                     Text(
@@ -375,6 +376,7 @@ fun NowPlayingSheet(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     val sourceBadge = when (song.source) {
+                        "YOUTUBE" -> "YouTube Music"
                         "DOWNLOADED" -> "Terunduh"
                         "JAMENDO" -> "Jamendo Online"
                         else -> "Penyimpanan Lokal"

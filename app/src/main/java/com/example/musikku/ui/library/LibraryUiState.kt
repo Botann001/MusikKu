@@ -19,6 +19,20 @@ enum class SongSortOrder(val label: String) {
     ARTIST("Artis")
 }
 
+enum class ExploreSourceTab {
+    YOUTUBE,
+    JAMENDO
+}
+
+data class YouTubeSearchState(
+    val query: String = "",
+    val results: List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> = emptyList(),
+    val trendingTracks: List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> = emptyList(),
+    val isSearching: Boolean = false,
+    val isLoadingStreamId: String? = null,
+    val errorMessage: String? = null
+)
+
 data class JamendoSearchState(
     val query: String = "",
     val results: List<JamendoTrackDto> = emptyList(),
@@ -30,7 +44,7 @@ data class JamendoSearchState(
     val downloadedIds: Set<Long> = emptySet()
 )
 
-/** State untuk LibraryScreen mencakup Semua Lagu, Favorit, Playlist, dan Jamendo. */
+/** State untuk LibraryScreen mencakup Semua Lagu, Favorit, Playlist, YouTube Music, dan Jamendo. */
 data class LibraryUiState(
     val songs: List<SongEntity> = emptyList(),
     val favoriteSongs: List<SongEntity> = emptyList(),
@@ -38,6 +52,8 @@ data class LibraryUiState(
     val playlists: List<PlaylistWithCount> = emptyList(),
     val selectedTab: LibraryTab = LibraryTab.SONGS,
     val searchQuery: String = "",
+    val exploreSourceTab: ExploreSourceTab = ExploreSourceTab.YOUTUBE,
+    val youTubeState: YouTubeSearchState = YouTubeSearchState(),
     val jamendoState: JamendoSearchState = JamendoSearchState(),
     val isOnline: Boolean = true,
     val downloadOnlyWifi: Boolean = true,

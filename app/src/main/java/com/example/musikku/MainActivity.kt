@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                         factory = LibraryViewModel.Factory(
                             repository = appContainer.musicRepository,
                             jamendoRepository = appContainer.jamendoRepository,
+                            youTubeMusicRepository = appContainer.youTubeMusicRepository,
                             settingsRepository = appContainer.settingsRepository,
                             networkMonitor = appContainer.networkMonitor,
                             musicController = appContainer.musicController

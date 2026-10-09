@@ -1,6 +1,7 @@
 package com.example.musikku.ui.library
 
 import android.Manifest
+import com.example.musikku.data.remote.youtube.toSongEntity
 import android.app.Activity
 import android.app.RecoverableSecurityException
 import android.content.pm.PackageManager
@@ -184,6 +185,7 @@ fun LibraryScreen(
     var playlistForRename by remember { mutableStateOf<PlaylistWithCount?>(null) }
     var songToDelete by remember { mutableStateOf<SongEntity?>(null) }
     var pendingSystemDeleteSong by remember { mutableStateOf<SongEntity?>(null) }
+    var pendingYouTubeTrackForPlaylist by remember { mutableStateOf<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto?>(null) }
 
     val deleteIntentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -297,6 +299,7 @@ fun LibraryScreen(
                     onTabSelected = { tab ->
                         selectedBottomTab = tab
                         if (tab == AppBottomTab.EXPLORE) {
+                            viewModel.loadTrendingYouTube()
                             viewModel.loadPopularJamendo()
                         }
                     }
@@ -316,16 +319,25 @@ fun LibraryScreen(
                 onCancelSleepTimer = viewModel::cancelSleepTimer
             )
         } else if (selectedBottomTab == AppBottomTab.EXPLORE) {
-            com.example.musikku.ui.jamendo.JamendoContent(
-                state = uiState.jamendoState,
+            com.example.musikku.ui.explore.ExploreScreen(
+                currentTab = uiState.exploreSourceTab,
+                onTabSelected = viewModel::setExploreSourceTab,
+                youTubeState = uiState.youTubeState,
+                jamendoState = uiState.jamendoState,
+                currentPlayingTitle = playbackState.currentSong?.title,
                 currentPlayingUri = playbackState.currentSong?.contentUri,
+                isPlaying = playbackState.isPlaying,
                 isOnline = uiState.isOnline,
                 downloadOnlyWifi = uiState.downloadOnlyWifi,
                 contentPadding = innerPadding,
-                onSearch = viewModel::searchJamendo,
-                onStream = viewModel::playJamendoTrack,
-                onDownload = viewModel::downloadJamendoTrack,
-                onDeleteDownload = viewModel::deleteDownloadedTrack,
+                onYouTubeSearch = viewModel::searchYouTube,
+                onYouTubePlay = viewModel::playYouTubeTrack,
+                onYouTubeAddToQueue = viewModel::addYouTubeTrackToQueue,
+                onYouTubeAddToPlaylist = { track -> pendingYouTubeTrackForPlaylist = track },
+                onJamendoSearch = viewModel::searchJamendo,
+                onJamendoStream = viewModel::playJamendoTrack,
+                onJamendoDownload = viewModel::downloadJamendoTrack,
+                onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
                 onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi
             )
         } else if (!hasPermission) {
@@ -398,16 +410,25 @@ fun LibraryScreen(
             }
 
             uiState.selectedTab == LibraryTab.JAMENDO -> {
-                com.example.musikku.ui.jamendo.JamendoContent(
-                    state = uiState.jamendoState,
+                com.example.musikku.ui.explore.ExploreScreen(
+                    currentTab = uiState.exploreSourceTab,
+                    onTabSelected = viewModel::setExploreSourceTab,
+                    youTubeState = uiState.youTubeState,
+                    jamendoState = uiState.jamendoState,
+                    currentPlayingTitle = playbackState.currentSong?.title,
                     currentPlayingUri = playbackState.currentSong?.contentUri,
+                    isPlaying = playbackState.isPlaying,
                     isOnline = uiState.isOnline,
                     downloadOnlyWifi = uiState.downloadOnlyWifi,
                     contentPadding = innerPadding,
-                    onSearch = viewModel::searchJamendo,
-                    onStream = viewModel::playJamendoTrack,
-                    onDownload = viewModel::downloadJamendoTrack,
-                    onDeleteDownload = viewModel::deleteDownloadedTrack,
+                    onYouTubeSearch = viewModel::searchYouTube,
+                    onYouTubePlay = viewModel::playYouTubeTrack,
+                    onYouTubeAddToQueue = viewModel::addYouTubeTrackToQueue,
+                    onYouTubeAddToPlaylist = { track -> pendingYouTubeTrackForPlaylist = track },
+                    onJamendoSearch = viewModel::searchJamendo,
+                    onJamendoStream = viewModel::playJamendoTrack,
+                    onJamendoDownload = viewModel::downloadJamendoTrack,
+                    onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
                     onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi
                 )
             }
@@ -425,6 +446,23 @@ fun LibraryScreen(
             onAddToPlaylist = { playlistId ->
                 viewModel.addSongToPlaylist(playlistId, song.id)
                 songForAddToPlaylist = null
+            },
+            onCreatePlaylist = { name ->
+                viewModel.createPlaylist(name)
+            }
+        )
+    }
+
+    // Dialog Tambah Lagu YouTube ke Playlist
+    pendingYouTubeTrackForPlaylist?.let { track ->
+        val dummySong = track.toSongEntity()
+        AddToPlaylistDialog(
+            song = dummySong,
+            playlists = uiState.playlists,
+            onDismiss = { pendingYouTubeTrackForPlaylist = null },
+            onAddToPlaylist = { playlistId ->
+                viewModel.addYouTubeTrackToPlaylist(track, playlistId)
+                pendingYouTubeTrackForPlaylist = null
             },
             onCreatePlaylist = { name ->
                 viewModel.createPlaylist(name)
