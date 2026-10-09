@@ -462,6 +462,35 @@ class MusicController(private val context: Context) {
         }
     }
 
+    /**
+     * Dijalankan saat lagu dihapus dari perangkat.
+     * Menghapus lagu dari antrean pemutaran dan menghentikan musik jika lagu yang dihapus sedang diputar.
+     */
+    fun onSongDeleted(songId: Long) {
+        val state = _playbackState.value
+        val isCurrentPlaying = state.currentSong?.id == songId
+        val index = currentPlaylist.indexOfFirst { it.id == songId }
+        if (index != -1) {
+            removeQueueItem(index)
+        }
+        if (isCurrentPlaying) {
+            if (currentPlaylist.isEmpty()) {
+                mediaController?.stop()
+                mediaController?.clearMediaItems()
+                _playbackState.update {
+                    it.copy(
+                        currentSong = null,
+                        currentIndex = -1,
+                        isPlaying = false,
+                        currentPosition = 0L,
+                        duration = 0L,
+                        queue = emptyList()
+                    )
+                }
+            }
+        }
+    }
+
     fun release() {
         sleepTimerJob?.cancel()
         progressJob?.cancel()

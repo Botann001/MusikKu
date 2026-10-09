@@ -1,9 +1,13 @@
 package com.example.musikku.ui.library
 
 import android.Manifest
+import android.app.Activity
+import android.app.RecoverableSecurityException
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -12,6 +16,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -176,6 +182,79 @@ fun LibraryScreen(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedPlaylistForDetail by remember { mutableStateOf<PlaylistWithCount?>(null) }
     var playlistForRename by remember { mutableStateOf<PlaylistWithCount?>(null) }
+    var songToDelete by remember { mutableStateOf<SongEntity?>(null) }
+    var pendingSystemDeleteSong by remember { mutableStateOf<SongEntity?>(null) }
+
+    val deleteIntentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val song = pendingSystemDeleteSong
+        if (result.resultCode == Activity.RESULT_OK && song != null) {
+            viewModel.deleteSong(song)
+            Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
+        } else if (song != null) {
+            Toast.makeText(context, "Penghapusan lagu dibatalkan", Toast.LENGTH_SHORT).show()
+        }
+        pendingSystemDeleteSong = null
+    }
+
+    val executeDeleteSong: (SongEntity) -> Unit = { song ->
+        val uri = try { Uri.parse(song.contentUri) } catch (e: Exception) { null }
+        if (song.source == "DOWNLOADED" || (song.filePath != null && !song.filePath.startsWith("/storage/emulated/0/"))) {
+            viewModel.deleteSong(song)
+            Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && uri != null && uri.scheme == "content") {
+            try {
+                pendingSystemDeleteSong = song
+                val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, listOf(uri))
+                deleteIntentLauncher.launch(
+                    IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                )
+            } catch (e: Exception) {
+                try {
+                    val count = context.contentResolver.delete(uri, null, null)
+                    if (count > 0) {
+                        viewModel.deleteSong(song)
+                        Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.deleteSong(song)
+                        Toast.makeText(context, "Lagu dihapus dari daftar", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (sec: Exception) {
+                    viewModel.deleteSong(song)
+                    Toast.makeText(context, "Lagu dihapus dari daftar", Toast.LENGTH_SHORT).show()
+                }
+                pendingSystemDeleteSong = null
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri != null && uri.scheme == "content") {
+            try {
+                val count = context.contentResolver.delete(uri, null, null)
+                if (count > 0) {
+                    viewModel.deleteSong(song)
+                    Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
+                }
+            } catch (sec: SecurityException) {
+                if (sec is RecoverableSecurityException) {
+                    pendingSystemDeleteSong = song
+                    deleteIntentLauncher.launch(
+                        IntentSenderRequest.Builder(sec.userAction.actionIntent.intentSender).build()
+                    )
+                } else {
+                    Toast.makeText(context, "Izin ditolak untuk menghapus file", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } else {
+            try {
+                if (uri != null && uri.scheme == "content") {
+                    context.contentResolver.delete(uri, null, null)
+                }
+                viewModel.deleteSong(song)
+                Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Gagal menghapus lagu: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.userMessageEvent.collect { message ->
@@ -279,7 +358,8 @@ fun LibraryScreen(
                         onToggleFavorite = viewModel::toggleFavorite,
                         onAddToQueue = viewModel::addToQueue,
                         onPlayNext = viewModel::playNext,
-                        onAddToPlaylist = { songForAddToPlaylist = it }
+                        onAddToPlaylist = { songForAddToPlaylist = it },
+                        onDeleteSong = { songToDelete = it }
                     )
                 }
             }
@@ -300,7 +380,8 @@ fun LibraryScreen(
                         onToggleFavorite = viewModel::toggleFavorite,
                         onAddToQueue = viewModel::addToQueue,
                         onPlayNext = viewModel::playNext,
-                        onAddToPlaylist = { songForAddToPlaylist = it }
+                        onAddToPlaylist = { songForAddToPlaylist = it },
+                        onDeleteSong = { songToDelete = it }
                     )
                 }
             }
@@ -424,7 +505,80 @@ fun LibraryScreen(
             },
             onRemoveAlbumCover = { songId ->
                 viewModel.removeCustomAlbumCover(songId)
-            }
+            },
+            onDeleteSong = { songToDelete = it }
+        )
+    }
+
+    // Dialog Konfirmasi Hapus Lagu dari Perangkat
+    songToDelete?.let { song ->
+        AlertDialog(
+            onDismissRequest = { songToDelete = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Hapus Lagu?",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Apakah Anda yakin ingin menghapus lagu ini dari penyimpanan perangkat?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "\"${song.title}\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ElectricLime
+                    )
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "File akan dihapus secara permanen dari perangkat dan tidak dapat dipulihkan.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val target = song
+                        songToDelete = null
+                        executeDeleteSong(target)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Hapus Permanen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { songToDelete = null }) {
+                    Text("Batal", color = Color.White)
+                }
+            },
+            containerColor = JetCard,
+            shape = RoundedCornerShape(20.dp)
         )
     }
 }
@@ -623,7 +777,8 @@ private fun SongList(
     onToggleFavorite: (Long) -> Unit,
     onAddToQueue: (SongEntity) -> Unit,
     onPlayNext: (SongEntity) -> Unit,
-    onAddToPlaylist: (SongEntity) -> Unit
+    onAddToPlaylist: (SongEntity) -> Unit,
+    onDeleteSong: (SongEntity) -> Unit = {}
 ) {
     LazyColumn(
         contentPadding = contentPadding,
@@ -769,7 +924,8 @@ private fun SongList(
                 onToggleFavorite = { onToggleFavorite(song.id) },
                 onAddToQueue = { onAddToQueue(song) },
                 onPlayNext = { onPlayNext(song) },
-                onAddToPlaylist = { onAddToPlaylist(song) }
+                onAddToPlaylist = { onAddToPlaylist(song) },
+                onDeleteFromDevice = { onDeleteSong(song) }
             )
         }
     }
@@ -785,7 +941,8 @@ private fun SongItem(
     onToggleFavorite: () -> Unit,
     onAddToQueue: () -> Unit,
     onPlayNext: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onDeleteFromDevice: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -927,6 +1084,20 @@ private fun SongItem(
                             showMenu = false
                         }
                     )
+                    DropdownMenuItem(
+                        text = { Text("Hapus dari perangkat", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onDeleteFromDevice()
+                        }
+                    )
                 }
             }
         }
@@ -948,7 +1119,8 @@ private fun FavoritesContent(
     onToggleFavorite: (Long) -> Unit,
     onAddToQueue: (SongEntity) -> Unit,
     onPlayNext: (SongEntity) -> Unit,
-    onAddToPlaylist: (SongEntity) -> Unit
+    onAddToPlaylist: (SongEntity) -> Unit,
+    onDeleteSong: (SongEntity) -> Unit = {}
 ) {
     LazyColumn(
         contentPadding = contentPadding,
@@ -995,7 +1167,8 @@ private fun FavoritesContent(
                 onToggleFavorite = { onToggleFavorite(song.id) },
                 onAddToQueue = { onAddToQueue(song) },
                 onPlayNext = { onPlayNext(song) },
-                onAddToPlaylist = { onAddToPlaylist(song) }
+                onAddToPlaylist = { onAddToPlaylist(song) },
+                onDeleteFromDevice = { onDeleteSong(song) }
             )
         }
     }

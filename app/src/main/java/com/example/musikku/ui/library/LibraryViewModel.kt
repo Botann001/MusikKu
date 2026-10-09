@@ -272,6 +272,29 @@ class LibraryViewModel(
     fun deleteDownloadedTrack(songId: Long) {
         viewModelScope.launch {
             jamendoRepository.deleteDownloadedTrack(songId)
+            musicController.onSongDeleted(songId)
+        }
+    }
+
+    /**
+     * Hapus lagu dari penyimpanan fisik dan database Room.
+     * Jika lagu sedang diputar, hentikan atau lewati pemutaran secara aman.
+     */
+    fun deleteSong(song: SongEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!song.filePath.isNullOrBlank()) {
+                try {
+                    val file = File(song.filePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            repository.deleteSong(song.id)
+            musicController.onSongDeleted(song.id)
         }
     }
 

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.example.musikku.data.local.entity.SongEntity
 import com.example.musikku.playback.PlaybackState
 import com.example.musikku.ui.common.AlbumArtPlaceholder
 import com.example.musikku.ui.theme.ElectricLime
@@ -103,7 +107,8 @@ fun NowPlayingSheet(
     onSetSleepTimer: (Int) -> Unit = {},
     onCancelSleepTimer: () -> Unit = {},
     onUpdateAlbumCover: (Long, Uri) -> Unit = { _, _ -> },
-    onRemoveAlbumCover: (Long) -> Unit = {}
+    onRemoveAlbumCover: (Long) -> Unit = {},
+    onDeleteSong: (SongEntity) -> Unit = {}
 ) {
     val song = playbackState.currentSong ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -193,19 +198,62 @@ fun NowPlayingSheet(
                     )
                 }
 
-                // Tombol Antrean (Lingkaran Gelap)
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFF1C1E1C),
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    IconButton(onClick = { showQueue = true }, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = "Buka Antrean",
-                            tint = if (showQueue) ElectricLime else Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Tombol Antrean (Lingkaran Gelap)
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF1C1E1C),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        IconButton(onClick = { showQueue = true }, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = "Buka Antrean",
+                                tint = if (showQueue) ElectricLime else Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Tombol Menu Opsi Lainnya (Hapus dari perangkat)
+                    var showHeaderMenu by remember { mutableStateOf(false) }
+                    Box {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF1C1E1C),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            IconButton(onClick = { showHeaderMenu = true }, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Opsi Lainnya",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showHeaderMenu,
+                            onDismissRequest = { showHeaderMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Hapus dari perangkat", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    showHeaderMenu = false
+                                    onDeleteSong(song)
+                                }
+                            )
+                        }
                     }
                 }
             }

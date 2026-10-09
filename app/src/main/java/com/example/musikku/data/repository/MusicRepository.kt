@@ -118,6 +118,15 @@ class MusicRepository(
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long) = withContext(Dispatchers.IO) {
         playlistDao.removeSongFromPlaylist(playlistId, songId)
     }
+
+    /**
+     * Hapus lagu sepenuhnya dari database (tabel songs, favorites, dan playlist_songs).
+     */
+    suspend fun deleteSong(songId: Long) = withContext(Dispatchers.IO) {
+        songDao.deleteSongById(songId)
+        favoriteDao.removeFavorite(songId)
+        playlistDao.removeSongFromAllPlaylists(songId)
+    }
 }
 
 /** Alias SongRepository untuk kesesuaian dengan penamaan spesifikasi */

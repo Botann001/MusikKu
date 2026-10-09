@@ -65,4 +65,7 @@ interface PlaylistDao {
 
     @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId AND songId = :songId")
     suspend fun removeSongFromPlaylist(playlistId: Long, songId: Long)
+
+    @Query("DELETE FROM playlist_songs WHERE songId = :songId")
+    suspend fun removeSongFromAllPlaylists(songId: Long)
 }
