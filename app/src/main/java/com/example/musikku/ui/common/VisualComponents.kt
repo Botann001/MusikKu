@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,8 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -99,42 +102,65 @@ fun LiveEqualizerIndicator(
 }
 
 /**
- * Menghasilkan gradien warna artistik unik berdasarkan string seed (misal judul lagu).
- * Mencegah tampilan cover lagu polosan kotak abu-abu mati.
+ * Menghasilkan gradien warna artistik unik yang selaras dengan tema modern.
  */
 fun getArtGradient(seed: String): Brush {
     val palettes = listOf(
-        listOf(Color(0xFF00E676), Color(0xFF004D20)),
-        listOf(Color(0xFF00C6FF), Color(0xFF0072FF)),
-        listOf(Color(0xFFF38181), Color(0xFFFCE38A)),
-        listOf(Color(0xFF8E2DE2), Color(0xFF4A00E0)),
-        listOf(Color(0xFF11998E), Color(0xFF38EF7D)),
-        listOf(Color(0xFFFF5E62), Color(0xFFFF9966)),
-        listOf(Color(0xFF00F260), Color(0xFF0575E6)),
-        listOf(Color(0xFFB92B27), Color(0xFF1565C0)),
-        listOf(Color(0xFF3A1C71), Color(0xFFD76D77))
+        // Mint / Emerald
+        listOf(Color(0xFF33D69F), Color(0xFF10B981)),
+        // Warm Camel / Tan
+        listOf(Color(0xFFBA967D), Color(0xFF8C6D56)),
+        // Coral / Peach
+        listOf(Color(0xFFFF9472), Color(0xFFF2709C)),
+        // Royal Violet / Indigo
+        listOf(Color(0xFF7B52AB), Color(0xFF4A2A82)),
+        // Ochre / Gold
+        listOf(Color(0xFFC99738), Color(0xFF8C6212)),
+        // Magenta / Rose
+        listOf(Color(0xFFE056A8), Color(0xFFA82B76)),
+        // Sky Cyan / Azure
+        listOf(Color(0xFF29B6F6), Color(0xFF0277BD)),
+        // Soft Olive / Lime
+        listOf(Color(0xFF9CCC65), Color(0xFF689F38))
     )
     val index = abs(seed.hashCode()) % palettes.size
     return Brush.linearGradient(palettes[index])
 }
 
 /**
- * Placeholder cover album dengan gradien cerah dan ikon musik bernuansa modern.
+ * Placeholder cover album dengan gradien artistik dan elemen visual lingkaran & not musik.
  */
 @Composable
 fun AlbumArtPlaceholder(
     seed: String,
     modifier: Modifier = Modifier,
-    iconSize: Dp = 24.dp
+    iconSize: Dp = 24.dp,
+    showConcentricRings: Boolean = false
 ) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.background(getArtGradient(seed))
     ) {
+        if (showConcentricRings) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val centerOffset = Offset(size.width * 0.55f, size.height * 0.45f)
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.08f),
+                    radius = size.minDimension * 0.55f,
+                    center = centerOffset
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.15f),
+                    radius = size.minDimension * 0.38f,
+                    center = centerOffset,
+                    style = Stroke(width = size.minDimension * 0.12f)
+                )
+            }
+        }
         Icon(
             imageVector = Icons.Default.MusicNote,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.9f),
+            tint = Color.White.copy(alpha = 0.95f),
             modifier = Modifier.size(iconSize)
         )
     }

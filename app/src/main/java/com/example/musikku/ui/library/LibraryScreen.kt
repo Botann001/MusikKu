@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -55,6 +58,19 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.ui.unit.sp
+import com.example.musikku.ui.theme.ElectricLime
+import com.example.musikku.ui.theme.OnElectricLime
+import com.example.musikku.ui.theme.JetBlack
+import com.example.musikku.ui.theme.JetSurface
+import com.example.musikku.ui.theme.JetCard
+import com.example.musikku.ui.theme.JetCardHigh
+import com.example.musikku.ui.theme.JetPill
+import com.example.musikku.ui.theme.JetBorder
+import com.example.musikku.ui.theme.TextWhite
+import com.example.musikku.ui.theme.TextMuted
+import com.example.musikku.ui.theme.FavoriteRed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -169,49 +185,43 @@ fun LibraryScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = JetBlack,
         topBar = {
             if (selectedBottomTab == AppBottomTab.LIBRARY) {
                 LibraryTopBar(
-                    scrollBehavior = scrollBehavior,
                     searchQuery = uiState.searchQuery,
                     selectedTab = uiState.selectedTab,
                     onSearchQueryChanged = viewModel::onSearchQueryChanged,
-                    onTabSelected = viewModel::selectTab,
+                    onTabSelected = { tab ->
+                        if (tab == LibraryTab.JAMENDO) {
+                            selectedBottomTab = AppBottomTab.EXPLORE
+                            viewModel.loadPopularJamendo()
+                        } else {
+                            viewModel.selectTab(tab)
+                        }
+                    },
                     onRefreshClick = viewModel::refreshLibrary
                 )
             }
         },
         bottomBar = {
-            Column {
+            Column(modifier = Modifier.background(JetBlack)) {
                 if (playbackState.currentSong != null) {
                     MiniPlayer(
                         playbackState = playbackState,
                         onClick = { showNowPlaying = true },
-                        onPlayPauseClick = viewModel::playPause,
-                        onNextClick = viewModel::skipToNext,
-                        onPrevClick = viewModel::skipToPrevious
+                        onPlayPauseClick = viewModel::playPause
                     )
                 }
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = selectedBottomTab == AppBottomTab.LIBRARY,
-                        onClick = { selectedBottomTab = AppBottomTab.LIBRARY },
-                        icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") },
-                        label = { Text("Library") }
-                    )
-                    NavigationBarItem(
-                        selected = selectedBottomTab == AppBottomTab.EXPLORE,
-                        onClick = { selectedBottomTab = AppBottomTab.EXPLORE },
-                        icon = { Icon(Icons.Default.Explore, contentDescription = "Jelajah") },
-                        label = { Text("Jelajah") }
-                    )
-                    NavigationBarItem(
-                        selected = selectedBottomTab == AppBottomTab.SETTINGS,
-                        onClick = { selectedBottomTab = AppBottomTab.SETTINGS },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Pengaturan") },
-                        label = { Text("Pengaturan") }
-                    )
-                }
+                ModernBottomNavigationBar(
+                    selectedTab = selectedBottomTab,
+                    onTabSelected = { tab ->
+                        selectedBottomTab = tab
+                        if (tab == AppBottomTab.EXPLORE) {
+                            viewModel.loadPopularJamendo()
+                        }
+                    }
+                )
             }
         }
     ) { innerPadding ->
@@ -227,9 +237,17 @@ fun LibraryScreen(
                 onCancelSleepTimer = viewModel::cancelSleepTimer
             )
         } else if (selectedBottomTab == AppBottomTab.EXPLORE) {
-            PlaceholderTabContent(
-                title = "Jelajah Musik",
-                modifier = Modifier.padding(innerPadding)
+            com.example.musikku.ui.jamendo.JamendoContent(
+                state = uiState.jamendoState,
+                currentPlayingUri = playbackState.currentSong?.contentUri,
+                isOnline = uiState.isOnline,
+                downloadOnlyWifi = uiState.downloadOnlyWifi,
+                contentPadding = innerPadding,
+                onSearch = viewModel::searchJamendo,
+                onStream = viewModel::playJamendoTrack,
+                onDownload = viewModel::downloadJamendoTrack,
+                onDeleteDownload = viewModel::deleteDownloadedTrack,
+                onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi
             )
         } else if (!hasPermission) {
             PermissionEmptyState(
@@ -256,6 +274,8 @@ fun LibraryScreen(
                         onSortOrderChanged = viewModel::setSortOrder,
                         contentPadding = innerPadding,
                         onSongClick = onSongClick,
+                        onPlayAll = { songs, index -> viewModel.playAll(songs, index) },
+                        onShuffleAll = { songs -> viewModel.playAll(songs.shuffled(), 0) },
                         onToggleFavorite = viewModel::toggleFavorite,
                         onAddToQueue = viewModel::addToQueue,
                         onPlayNext = viewModel::playNext,
@@ -409,70 +429,127 @@ fun LibraryScreen(
     }
 }
 
-// ─── Top Bar & Tabs ─────────────────────────────────────────────────────────────
+// ─── Top Bar & Tabs Sesuai Image 1 ───────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryTopBar(
-    scrollBehavior: TopAppBarScrollBehavior,
     searchQuery: String,
     selectedTab: LibraryTab,
     onSearchQueryChanged: (String) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onRefreshClick: () -> Unit
 ) {
-    Column {
-        LargeTopAppBar(
-            title = { Text("MusikKu") },
-            scrollBehavior = scrollBehavior,
-            actions = {
-                IconButton(onClick = onRefreshClick) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Pindai Musik"
-                    )
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(JetBlack)
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp)
+    ) {
+        // ─── Header: KOLEKSIMU / Library + Circular Refresh Button ───────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "KOLEKSIMU",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMuted,
+                    letterSpacing = 1.8.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Library",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
             }
-        )
 
-        // Bilah Pencarian (hanya untuk tab lokal)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(JetPill)
+                    .clickable(onClick = onRefreshClick)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Pindai Musik",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ─── Pill Search Bar ──────────────────────────────────────────────
         if (selectedTab != LibraryTab.JAMENDO) {
             SearchBar(
                 query = searchQuery,
                 onQueryChanged = onSearchQueryChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                modifier = Modifier.fillMaxWidth()
             )
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
-        // Baris Tab: Semua Lagu, Favorit, Playlist, Jamendo (Scrollable agar tidak terpotong)
-        PrimaryScrollableTabRow(
-            selectedTabIndex = selectedTab.ordinal,
-            edgePadding = 16.dp,
-            modifier = Modifier.fillMaxWidth()
+        // ─── Filter Pills Row: Semua Lagu, Favorit, Playlist, Jamendo ─────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Tab(
-                selected = selectedTab == LibraryTab.SONGS,
-                onClick = { onTabSelected(LibraryTab.SONGS) },
-                text = { Text("Semua Lagu") }
+            FilterPill(
+                label = "Semua Lagu",
+                isSelected = selectedTab == LibraryTab.SONGS,
+                onClick = { onTabSelected(LibraryTab.SONGS) }
             )
-            Tab(
-                selected = selectedTab == LibraryTab.FAVORITES,
-                onClick = { onTabSelected(LibraryTab.FAVORITES) },
-                text = { Text("Favorit") }
+            FilterPill(
+                label = "Favorit",
+                isSelected = selectedTab == LibraryTab.FAVORITES,
+                onClick = { onTabSelected(LibraryTab.FAVORITES) }
             )
-            Tab(
-                selected = selectedTab == LibraryTab.PLAYLISTS,
-                onClick = { onTabSelected(LibraryTab.PLAYLISTS) },
-                text = { Text("Playlist") }
+            FilterPill(
+                label = "Playlist",
+                isSelected = selectedTab == LibraryTab.PLAYLISTS,
+                onClick = { onTabSelected(LibraryTab.PLAYLISTS) }
             )
-            Tab(
-                selected = selectedTab == LibraryTab.JAMENDO,
-                onClick = { onTabSelected(LibraryTab.JAMENDO) },
-                text = { Text("Jamendo") }
+            FilterPill(
+                label = "Jamendo",
+                isSelected = selectedTab == LibraryTab.JAMENDO,
+                onClick = { onTabSelected(LibraryTab.JAMENDO) }
             )
         }
+    }
+}
+
+@Composable
+private fun FilterPill(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (isSelected) ElectricLime else JetPill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 9.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) OnElectricLime else Color.White
+        )
     }
 }
 
@@ -485,29 +562,51 @@ private fun SearchBar(
     TextField(
         value = query,
         onValueChange = onQueryChanged,
-        placeholder = { Text("Cari lagu, artis, album…") },
+        placeholder = {
+            Text(
+                text = "Cari lagu, artis, album",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
         leadingIcon = {
-            Icon(Icons.Default.Search, contentDescription = "Cari")
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Cari",
+                tint = TextMuted,
+                modifier = Modifier.size(20.dp)
+            )
         },
         trailingIcon = {
             AnimatedVisibility(visible = query.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
                 IconButton(onClick = { onQueryChanged("") }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Hapus pencarian")
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Hapus pencarian",
+                        tint = TextMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(50),
         colors = TextFieldDefaults.colors(
+            focusedContainerColor = JetCard,
+            unfocusedContainerColor = JetCard,
+            disabledContainerColor = JetCard,
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            cursorColor = ElectricLime
         ),
-        modifier = modifier
+        modifier = modifier.height(50.dp)
     )
 }
 
-// ─── Song List ──────────────────────────────────────────────────────────────────
+// ─── Song List Sesuai Image 1 ───────────────────────────────────────────────────
 
 @Composable
 private fun SongList(
@@ -519,6 +618,8 @@ private fun SongList(
     onSortOrderChanged: (SongSortOrder) -> Unit = {},
     contentPadding: PaddingValues,
     onSongClick: (SongEntity) -> Unit,
+    onPlayAll: (List<SongEntity>, Int) -> Unit = { _, _ -> },
+    onShuffleAll: (List<SongEntity>) -> Unit = {},
     onToggleFavorite: (Long) -> Unit,
     onAddToQueue: (SongEntity) -> Unit,
     onPlayNext: (SongEntity) -> Unit,
@@ -528,116 +629,130 @@ private fun SongList(
         contentPadding = contentPadding,
         modifier = Modifier.fillMaxSize()
     ) {
-        // Baris Header: Jumlah lagu dan Pilihan Urutan (A-Z, Baru Ditambah, dll.)
-        item(key = "sort_header") {
+        // ─── Header Tindakan: Putar semua, Acak, Pilihan Urutan (A-Z) ───────
+        item(key = "action_header") {
+            var showSortMenu by remember { mutableStateOf(false) }
+            val sortLabel = when (sortOrder) {
+                SongSortOrder.TITLE_AZ -> "A–Z"
+                SongSortOrder.DATE_ADDED -> "Baru"
+                SongSortOrder.TITLE_ZA -> "Z–A"
+                SongSortOrder.ARTIST -> "Artis"
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${songs.size} Lagu",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Tombol "Putar semua" (White Capsule)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .clickable(onClick = { if (songs.isNotEmpty()) onPlayAll(songs, 0) })
+                        .padding(horizontal = 18.dp, vertical = 9.dp)
                 ) {
-                    FilterChip(
-                        selected = sortOrder == SongSortOrder.TITLE_AZ,
-                        onClick = { onSortOrderChanged(SongSortOrder.TITLE_AZ) },
-                        label = { Text("A-Z") },
-                        leadingIcon = if (sortOrder == SongSortOrder.TITLE_AZ) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        } else null
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Putar semua",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                // Tombol Acak Bulat Gelap
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(JetPill)
+                        .clickable(onClick = { if (songs.isNotEmpty()) onShuffleAll(songs) })
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Acak Semua",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
+                }
 
-                    FilterChip(
-                        selected = sortOrder == SongSortOrder.DATE_ADDED,
-                        onClick = { onSortOrderChanged(SongSortOrder.DATE_ADDED) },
-                        label = { Text("Baru Ditambah") },
-                        leadingIcon = if (sortOrder == SongSortOrder.DATE_ADDED) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        } else null
-                    )
+                Spacer(modifier = Modifier.weight(1f))
 
-                    var showSortMenu by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(
-                            onClick = { showSortMenu = true },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Sort,
-                                contentDescription = "Pilihan Urutan Lainnya",
-                                tint = if (sortOrder == SongSortOrder.TITLE_ZA || sortOrder == SongSortOrder.ARTIST)
-                                    MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                // Indikator `${songs.size} lagu · A–Z`
+                Box {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showSortMenu = true }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${songs.size} lagu · $sortLabel",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMuted,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Nama (A-Z)") },
-                                onClick = {
-                                    onSortOrderChanged(SongSortOrder.TITLE_AZ)
-                                    showSortMenu = false
-                                },
-                                leadingIcon = if (sortOrder == SongSortOrder.TITLE_AZ) {
-                                    { Icon(Icons.Default.Check, contentDescription = null) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Nama (Z-A)") },
-                                onClick = {
-                                    onSortOrderChanged(SongSortOrder.TITLE_ZA)
-                                    showSortMenu = false
-                                },
-                                leadingIcon = if (sortOrder == SongSortOrder.TITLE_ZA) {
-                                    { Icon(Icons.Default.Check, contentDescription = null) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Baru Ditambah") },
-                                onClick = {
-                                    onSortOrderChanged(SongSortOrder.DATE_ADDED)
-                                    showSortMenu = false
-                                },
-                                leadingIcon = if (sortOrder == SongSortOrder.DATE_ADDED) {
-                                    { Icon(Icons.Default.Check, contentDescription = null) }
-                                } else null
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Artis") },
-                                onClick = {
-                                    onSortOrderChanged(SongSortOrder.ARTIST)
-                                    showSortMenu = false
-                                },
-                                leadingIcon = if (sortOrder == SongSortOrder.ARTIST) {
-                                    { Icon(Icons.Default.Check, contentDescription = null) }
-                                } else null
-                            )
-                        }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Nama (A-Z)") },
+                            onClick = {
+                                onSortOrderChanged(SongSortOrder.TITLE_AZ)
+                                showSortMenu = false
+                            },
+                            leadingIcon = if (sortOrder == SongSortOrder.TITLE_AZ) {
+                                { Icon(Icons.Default.Check, contentDescription = null, tint = ElectricLime) }
+                            } else null
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Baru Ditambah") },
+                            onClick = {
+                                onSortOrderChanged(SongSortOrder.DATE_ADDED)
+                                showSortMenu = false
+                            },
+                            leadingIcon = if (sortOrder == SongSortOrder.DATE_ADDED) {
+                                { Icon(Icons.Default.Check, contentDescription = null, tint = ElectricLime) }
+                            } else null
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Nama (Z-A)") },
+                            onClick = {
+                                onSortOrderChanged(SongSortOrder.TITLE_ZA)
+                                showSortMenu = false
+                            },
+                            leadingIcon = if (sortOrder == SongSortOrder.TITLE_ZA) {
+                                { Icon(Icons.Default.Check, contentDescription = null, tint = ElectricLime) }
+                            } else null
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Artis") },
+                            onClick = {
+                                onSortOrderChanged(SongSortOrder.ARTIST)
+                                showSortMenu = false
+                            },
+                            leadingIcon = if (sortOrder == SongSortOrder.ARTIST) {
+                                { Icon(Icons.Default.Check, contentDescription = null, tint = ElectricLime) }
+                            } else null
+                        )
                     }
                 }
             }
@@ -674,53 +789,38 @@ private fun SongItem(
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    val titleColor = if (isCurrentPlaying) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-
     var isImageError by remember(song.albumArtUri) { mutableStateOf(false) }
     val showPlaceholder = song.albumArtUri.isBlank() || isImageError
 
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCurrentPlaying) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-            }
+            containerColor = if (isCurrentPlaying) JetCardHigh else JetCard
         ),
         border = if (isCurrentPlaying) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.65f))
+            BorderStroke(1.dp, ElectricLime.copy(alpha = 0.5f))
         } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+            BorderStroke(1.dp, JetBorder.copy(alpha = 0.35f))
         },
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isCurrentPlaying) 3.dp else 0.dp
-        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 3.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            // Thumbnail Album Cover (Squircle 10.dp)
+            // Thumbnail Album Cover (Squircle 52.dp, rounded 14.dp)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (isCurrentPlaying) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(JetPill)
             ) {
                 if (!showPlaceholder) {
                     AsyncImage(
@@ -734,7 +834,7 @@ private fun SongItem(
                     AlbumArtPlaceholder(
                         seed = song.title,
                         modifier = Modifier.matchParentSize(),
-                        iconSize = 22.dp
+                        iconSize = 24.dp
                     )
                 }
             }
@@ -744,66 +844,58 @@ private fun SongItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrentPlaying) FontWeight.Bold else FontWeight.Medium,
-                    color = titleColor,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isCurrentPlaying) ElectricLime else Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "${song.artist} • ${formatDuration(song.duration)}",
+                    text = "${song.artist} · ${formatDuration(song.duration)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isCurrentPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = TextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            // Indikator Live Equalizer Berdenyut saat lagu sedang aktif diputar
+            // Indikator Live Equalizer saat sedang memutar lagu
             if (isCurrentPlaying) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    LiveEqualizerIndicator(
-                        isPlaying = isPlaying,
-                        tint = MaterialTheme.colorScheme.primary,
-                        maxHeight = 14.dp,
-                        barWidth = 2.5.dp,
-                        spacing = 2.dp
-                    )
-                }
+                LiveEqualizerIndicator(
+                    isPlaying = isPlaying,
+                    tint = ElectricLime,
+                    maxHeight = 16.dp,
+                    barWidth = 2.5.dp,
+                    spacing = 2.dp,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
             }
 
-            // Tombol Cepat Favorit (Hati)
+            // Tombol Cepat Favorit (Hati Coral Red / Subtle Outline)
             IconButton(
                 onClick = onToggleFavorite,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(38.dp)
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Hapus favorit" else "Tambah favorit",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (isFavorite) FavoriteRed else TextMuted,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            // Tombol Menu Opsi
+            // Tombol Menu Opsi (Antrean, Playlist)
             Box {
                 IconButton(
                     onClick = { showMenu = true },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Menu Opsi",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
@@ -1051,15 +1143,13 @@ private fun PlaylistsContent(
     }
 }
 
-// ─── Mini Player ────────────────────────────────────────────────────────────────
+// ─── Mini Player Sesuai Image 1 ─────────────────────────────────────────────────
 
 @Composable
 private fun MiniPlayer(
     playbackState: PlaybackState,
     onClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
-    onNextClick: () -> Unit,
-    onPrevClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val song = playbackState.currentSong ?: return
@@ -1068,34 +1158,33 @@ private fun MiniPlayer(
         (playbackState.currentPosition.toFloat() / playbackState.duration.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
-    Surface(
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = JetCard),
+        border = BorderStroke(1.dp, JetBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 10.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-        color = MaterialTheme.colorScheme.surfaceVariant
+            .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
         Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(start = 10.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             ) {
-                // Thumbnail Album Cover (Squircle 12.dp)
+                // Thumbnail Album Cover (Squircle 48.dp, rounded 14.dp)
                 var isMiniError by remember(song.albumArtUri) { mutableStateOf(false) }
                 val showMiniPlaceholder = song.albumArtUri.isBlank() || isMiniError
 
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(JetPill)
                 ) {
                     if (!showMiniPlaceholder) {
                         AsyncImage(
@@ -1117,73 +1206,40 @@ private fun MiniPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        LiveEqualizerIndicator(
-                            isPlaying = playbackState.isPlaying,
-                            tint = MaterialTheme.colorScheme.primary,
-                            maxHeight = 12.dp,
-                            barWidth = 2.dp,
-                            spacing = 1.5.dp
-                        )
-                    }
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = song.artist,
+                        text = "${song.artist} · ${formatDuration(playbackState.currentPosition)} / ${formatDuration(playbackState.duration)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                IconButton(
-                    onClick = onPrevClick,
-                    modifier = Modifier.size(36.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Tombol Bulat Electric Lime Putar/Jeda (46.dp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(ElectricLime)
+                        .clickable(onClick = onPlayPauseClick)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Lagu Sebelumnya",
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    IconButton(
-                        onClick = onPlayPauseClick,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = onNextClick,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Lagu Berikutnya",
-                        modifier = Modifier.size(22.dp)
+                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
+                        tint = OnElectricLime,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -1193,9 +1249,119 @@ private fun MiniPlayer(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.5.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    .height(3.dp),
+                color = ElectricLime,
+                trackColor = Color.Transparent
+            )
+        }
+    }
+}
+
+// ─── Modern Bottom Navigation Bar Sesuai Image 1 & 3 ───────────────────────────
+
+@Composable
+private fun ModernBottomNavigationBar(
+    selectedTab: AppBottomTab,
+    onTabSelected: (AppBottomTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = JetSurface,
+        tonalElevation = 8.dp,
+        shadowElevation = 16.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tab 1: Library
+            BottomNavTabItem(
+                label = "Library",
+                icon = Icons.Default.LibraryMusic,
+                isSelected = selectedTab == AppBottomTab.LIBRARY,
+                onClick = { onTabSelected(AppBottomTab.LIBRARY) }
+            )
+
+            // Tab 2: Jelajah
+            BottomNavTabItem(
+                label = "Jelajah",
+                icon = Icons.Default.Explore,
+                isSelected = selectedTab == AppBottomTab.EXPLORE,
+                onClick = { onTabSelected(AppBottomTab.EXPLORE) }
+            )
+
+            // Tab 3: Pengaturan
+            BottomNavTabItem(
+                label = "Pengaturan",
+                icon = Icons.Default.Tune,
+                isSelected = selectedTab == AppBottomTab.SETTINGS,
+                onClick = { onTabSelected(AppBottomTab.SETTINGS) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomNavTabItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    if (isSelected) {
+        // Active capsule pill: Electric Lime dengan icon & text hitam pekat
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(ElectricLime)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 22.dp, vertical = 10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = OnElectricLime,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = OnElectricLime
+                )
+            }
+        }
+    } else {
+        // Inactive: Ikon dan teks vertikal halus abu-abu
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = TextMuted,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                fontWeight = FontWeight.Medium
             )
         }
     }

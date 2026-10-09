@@ -2,35 +2,51 @@ package com.example.musikku.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ─── Deep AMOLED Midnight & Neon Emerald Palette ─────────────────────────────────
+// ─── Electric Lime & Jet Black Modern Palette ─────────────────────────────────
 
-// Primary Accents (Neon Emerald & Mint)
-val NeonEmerald = Color(0xFF00E676)
+// Primary Accents (Electric Acid Lime)
+val ElectricLime = Color(0xFFCCF655)
+val ElectricLimeBright = Color(0xFFD4F866)
+val ElectricLimeDim = Color(0xFFAFD63E)
+val ElectricLimeContainer = Color(0xFF1E280C)
+val OnElectricLime = Color(0xFF111409)
+
+// Backwards-compatible aliases
+val NeonEmerald = ElectricLime
 val EmeraldSpotify = Color(0xFF1DB954)
 val EmeraldMint = Color(0xFF69F0AE)
-val EmeraldDark = Color(0xFF003816)
-val EmeraldContainer = Color(0xFF0C381E)
-val OnEmeraldContainer = Color(0xFF7BFFAB)
+val EmeraldDark = OnElectricLime
+val EmeraldContainer = ElectricLimeContainer
+val OnEmeraldContainer = ElectricLime
 
-// AMOLED Midnight Backgrounds & Surfaces
-val AmoledBlack = Color(0xFF060907)
-val MidnightDark = Color(0xFF0C120E)
-val MidnightCard = Color(0xFF131B15)
-val MidnightCardHigh = Color(0xFF19241C)
-val MidnightBorder = Color(0xFF24362A)
+// Deep Jet Black Surfaces & Backgrounds
+val JetBlack = Color(0xFF0F100F)
+val JetSurface = Color(0xFF141514)
+val JetCard = Color(0xFF181A18)
+val JetCardHigh = Color(0xFF1F221F)
+val JetPill = Color(0xFF1D1F1D)
+val JetBorder = Color(0xFF262826)
+
+val AmoledBlack = JetBlack
+val MidnightDark = JetSurface
+val MidnightCard = JetCard
+val MidnightCardHigh = JetCardHigh
+val MidnightBorder = JetBorder
 
 // Text & Accents (Dark Mode)
-val TextWhite = Color(0xFFF3F7F4)
-val TextMuted = Color(0xFF8FA395)
-val TextDisabled = Color(0xFF56695D)
+val TextWhite = Color(0xFFFFFFFF)
+val TextMuted = Color(0xFF8E908E)
+val TextSubtle = Color(0xFF5D605D)
+val TextDisabled = Color(0xFF484B48)
 val ErrorRed = Color(0xFFFF5252)
+val FavoriteRed = Color(0xFFFF6B6B)
 
 // Light Theme Palette
-val EmeraldLightPrimary = Color(0xFF008744)
-val EmeraldLightBg = Color(0xFFF5FAF7)
+val EmeraldLightPrimary = Color(0xFF4C7D08)
+val EmeraldLightBg = Color(0xFFF7FAF5)
 val EmeraldLightSurface = Color(0xFFFFFFFF)
-val EmeraldLightSurfaceVariant = Color(0xFFE4EDE7)
-val EmeraldLightCardHigh = Color(0xFFEDF5F0)
-val EmeraldLightBorder = Color(0xFFC6D7CC)
-val TextLightPrimary = Color(0xFF0D1912)
-val TextLightSecondary = Color(0xFF4B5E52)
+val EmeraldLightSurfaceVariant = Color(0xFFE9EFE6)
+val EmeraldLightCardHigh = Color(0xFFF1F6EE)
+val EmeraldLightBorder = Color(0xFFD0DCD0)
+val TextLightPrimary = Color(0xFF111409)
+val TextLightSecondary = Color(0xFF555B51)

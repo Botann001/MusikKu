@@ -1,6 +1,11 @@
 package com.example.musikku.ui.player
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,36 +17,41 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import com.example.musikku.ui.common.AlbumArtPlaceholder
-import com.example.musikku.ui.common.LiveEqualizerIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,28 +63,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.example.musikku.playback.PlaybackState
-
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Surface
-import androidx.compose.material3.TextButton
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
+import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.theme.ElectricLime
+import com.example.musikku.ui.theme.ElectricLimeContainer
+import com.example.musikku.ui.theme.FavoriteRed
+import com.example.musikku.ui.theme.JetBlack
+import com.example.musikku.ui.theme.JetCard
+import com.example.musikku.ui.theme.OnElectricLime
+import com.example.musikku.ui.theme.TextMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +110,7 @@ fun NowPlayingSheet(
     var showQueue by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showCoverOptionsDialog by remember { mutableStateOf(false) }
+    var showLyricsDialog by remember { mutableStateOf(false) }
     var isImageError by remember(song.albumArtUri) { mutableStateOf(false) }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
@@ -112,7 +121,6 @@ fun NowPlayingSheet(
         }
     }
 
-    // State untuk dragging slider agar waktu tidak melompat ketika digeser oleh jari pengguna
     var isDraggingSlider by remember { mutableStateOf(false) }
     var draggedPosition by remember { mutableFloatStateOf(0f) }
 
@@ -127,98 +135,107 @@ fun NowPlayingSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = JetBlack,
+        dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.92f)
+                .fillMaxHeight(0.96f)
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
+                .padding(top = 10.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // ─── Header ─────────────────────────────────────────────────────────────
+            // ─── 1. Header: Chevron Down, "MEMUTAR DARI", Queue ─────────────────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Tutup Layar Pemutar",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.weight(1f)
+                // Tombol Tutup (Lingkaran Gelap)
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF1C1E1C),
+                    modifier = Modifier.size(44.dp)
                 ) {
-                    LiveEqualizerIndicator(
-                        isPlaying = playbackState.isPlaying,
-                        tint = MaterialTheme.colorScheme.primary,
-                        maxHeight = 14.dp,
-                        barWidth = 2.5.dp,
-                        spacing = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onDismiss, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Tutup Layar Pemutar",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                // Judul Tengah: MEMUTAR DARI
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "SEDANG DIPUTAR",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "MEMUTAR DARI",
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center
+                        color = TextMuted,
+                        letterSpacing = 1.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    val sourceText = if (song.source == "JAMENDO") "Jelajah · Jamendo"
+                                     else if (song.source == "DOWNLOADED") "Library · Terunduh"
+                                     else "Library · Semua Lagu"
+                    Text(
+                        text = sourceText,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
 
-                val isSleepTimerActive = playbackState.sleepTimerRemainingSeconds > 0
-                IconButton(onClick = { showSleepTimerDialog = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Bedtime,
-                        contentDescription = "Sleep Timer",
-                        tint = if (isSleepTimerActive) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                IconButton(onClick = { showQueue = true }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                        contentDescription = "Buka Antrean",
-                        tint = if (showQueue) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurface
-                    )
+                // Tombol Antrean (Lingkaran Gelap)
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF1C1E1C),
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    IconButton(onClick = { showQueue = true }, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = "Buka Antrean",
+                            tint = if (showQueue) ElectricLime else Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // ─── Artwork Cover dengan Ambient Halo Glow ─────────────────────────────
+            // ─── 2. Cover Album Besar dengan Ambient Glow & Tombol "+ Tambah cover" ─
             val hasCustomCover = song.albumArtUri.startsWith("file://")
             val isBlankOrError = song.albumArtUri.isBlank() || isImageError
 
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
+                    .fillMaxWidth()
                     .aspectRatio(1f)
             ) {
-                // Ambient Halo Glow Layer di belakang cover
+                // Ambient Glow di belakang cover
                 Box(
                     modifier = Modifier
                         .fillMaxSize(0.92f)
                         .shadow(
-                            elevation = 36.dp,
+                            elevation = 42.dp,
                             shape = RoundedCornerShape(28.dp),
-                            ambientColor = MaterialTheme.colorScheme.primary,
-                            spotColor = MaterialTheme.colorScheme.primary
+                            ambientColor = ElectricLime.copy(alpha = 0.35f),
+                            spotColor = ElectricLime.copy(alpha = 0.35f)
                         )
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                    ElectricLime.copy(alpha = 0.22f),
                                     Color.Transparent
                                 )
                             ),
@@ -226,20 +243,16 @@ fun NowPlayingSheet(
                         )
                 )
 
-                // Kartu Album Art Utama
+                // Kartu Cover Utama
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxSize()
-                        .shadow(16.dp, RoundedCornerShape(24.dp))
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(JetCard)
                         .clickable {
-                            if (hasCustomCover) {
-                                showCoverOptionsDialog = true
-                            } else {
-                                pickImageLauncher.launch("image/*")
-                            }
+                            if (hasCustomCover) showCoverOptionsDialog = true
+                            else pickImageLauncher.launch("image/*")
                         }
                 ) {
                     if (!isBlankOrError) {
@@ -251,117 +264,103 @@ fun NowPlayingSheet(
                             onSuccess = { isImageError = false },
                             modifier = Modifier.fillMaxSize()
                         )
-
-                        // Tombol edit cover melayang di pojok kanan bawah
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                            shadowElevation = 6.dp,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(12.dp)
-                                .size(42.dp)
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    if (hasCustomCover) {
-                                        showCoverOptionsDialog = true
-                                    } else {
-                                        pickImageLauncher.launch("image/*")
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Ubah Cover Album",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
                     } else {
-                        // Fallback interaktif dengan gradien artistik
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            AlbumArtPlaceholder(
-                                seed = song.title,
-                                modifier = Modifier.matchParentSize(),
-                                iconSize = 48.dp
-                            )
+                        AlbumArtPlaceholder(
+                            seed = song.title,
+                            modifier = Modifier.fillMaxSize(),
+                            iconSize = 64.dp,
+                            showConcentricRings = true
+                        )
+                    }
 
-                            // Overlay info tambah cover
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.Black.copy(alpha = 0.5f),
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .align(Alignment.BottomCenter)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AddPhotoAlternate,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Tambah Cover",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
+                    // Tombol "+ Tambah cover" di pojok kiri bawah (Sesuai Image 2)
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = 0.65f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp)
+                            .clickable {
+                                if (hasCustomCover) showCoverOptionsDialog = true
+                                else pickImageLauncher.launch("image/*")
                             }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Tambah cover",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // ─── Metadata Judul, Artis, & Tombol Favorit ────────────────────────────
+            // ─── 3. Judul Lagu, Artis & Tombol Favorit ──────────────────────────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    val sourceBadge = when (song.source) {
+                        "DOWNLOADED" -> "Terunduh"
+                        "JAMENDO" -> "Jamendo Online"
+                        else -> "Penyimpanan Lokal"
+                    }
                     Text(
-                        text = "${song.artist} • ${song.album}",
+                        text = "${song.artist} · $sourceBadge",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Hapus dari Favorit" else "Tambah ke Favorit",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(30.dp)
-                    )
+                // Tombol Hati (Favorit) Berbentuk Lingkaran Gelap
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF1C1E1C),
+                    border = BorderStroke(1.dp, Color(0xFF282B28)),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Hapus dari Favorit" else "Tambah ke Favorit",
+                            tint = if (isFavorite) FavoriteRed else Color(0xFF8E908E),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // ─── Seek Slider ────────────────────────────────────────────────────────
+            // ─── 4. Seekbar / Slider dengan Garis Lime & Waktu ─────────────────────
             Column(modifier = Modifier.fillMaxWidth()) {
                 Slider(
                     value = sliderValue,
@@ -374,8 +373,9 @@ fun NowPlayingSheet(
                         isDraggingSlider = false
                     },
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
+                        thumbColor = Color.White,
+                        activeTrackColor = ElectricLime,
+                        inactiveTrackColor = Color(0xFF2E312E)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -387,116 +387,139 @@ fun NowPlayingSheet(
                     Text(
                         text = formatDuration(currentPosition),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
                     Text(
                         text = formatDuration(duration),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ─── 5. Kontrol Pemutar Musik (Shuffle, Prev, Big Lime Play, Next, Repeat)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onToggleShuffle, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Acak Lagu",
+                        tint = if (playbackState.isShuffleEnabled) ElectricLime else Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+
+                IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Lagu Sebelumnya",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Tombol Play/Pause Besar Warna Neon Lime Bercahaya
+                Surface(
+                    shape = CircleShape,
+                    color = ElectricLime,
+                    shadowElevation = 16.dp,
+                    modifier = Modifier.size(76.dp)
+                ) {
+                    IconButton(onClick = onPlayPause, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
+                            tint = OnElectricLime,
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
+                }
+
+                IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Lagu Berikutnya",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                IconButton(onClick = onToggleRepeat, modifier = Modifier.size(44.dp)) {
+                    val repeatIcon = if (playbackState.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
+                    val repeatTint = if (playbackState.repeatMode != Player.REPEAT_MODE_OFF) ElectricLime else Color.White
+                    Icon(
+                        imageVector = repeatIcon,
+                        contentDescription = "Ulangi Lagu",
+                        tint = repeatTint,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ─── Baris Kontrol Pemutaran ────────────────────────────────────────────
+            // ─── 6. Baris Tiga Tombol Pill (Timer Tidur, Lirik, Offline) ───────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Tombol Shuffle
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Acak Lagu",
-                        tint = if (playbackState.isShuffleEnabled) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                // Pill 1: Timer tidur
+                NowPlayingActionPill(
+                    icon = Icons.Default.Bedtime,
+                    label = "Timer tidur",
+                    isActive = playbackState.sleepTimerRemainingSeconds > 0,
+                    onClick = { showSleepTimerDialog = true },
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Tombol Sebelumnya
-                IconButton(
-                    onClick = onPrevious,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Lagu Sebelumnya",
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.width(8.dp))
 
-                // Tombol Play / Pause (Besar)
-                FilledIconButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier.size(68.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playbackState.isPlaying) "Jeda" else "Putar",
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
+                // Pill 2: Lirik
+                NowPlayingActionPill(
+                    icon = Icons.Default.GraphicEq,
+                    label = "Lirik",
+                    isActive = false,
+                    onClick = { showLyricsDialog = true },
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Tombol Berikutnya
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Lagu Berikutnya",
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.width(8.dp))
 
-                // Tombol Repeat Mode
-                IconButton(onClick = onToggleRepeat) {
-                    val repeatIcon = if (playbackState.repeatMode == Player.REPEAT_MODE_ONE) {
-                        Icons.Default.RepeatOne
-                    } else {
-                        Icons.Default.Repeat
-                    }
-                    val repeatTint = if (playbackState.repeatMode != Player.REPEAT_MODE_OFF) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    Icon(
-                        imageVector = repeatIcon,
-                        contentDescription = "Ulangi Lagu",
-                        tint = repeatTint
-                    )
-                }
+                // Pill 3: Offline
+                NowPlayingActionPill(
+                    icon = Icons.Default.Download,
+                    label = "Offline",
+                    isActive = song.source == "DOWNLOADED" || song.source == "LOCAL",
+                    onClick = { },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 
-    // Tampilkan Antrean jika tombol queue diklik
+    // ─── Bottom Sheet Antrean Lagu (QueueSheet) ──────────────────────────────
     if (showQueue) {
         QueueSheet(
             queue = playbackState.queue,
             currentIndex = playbackState.currentIndex,
             onDismiss = { showQueue = false },
-            onPlayQueueItem = { index ->
-                onPlayQueueItem(index)
-                showQueue = false
-            },
+            onPlayQueueItem = onPlayQueueItem,
             onRemoveQueueItem = onRemoveQueueItem,
             onMoveQueueItem = onMoveQueueItem
         )
     }
 
-    // Dialog Opsi Sampul Album Kustom
+    // ─── Dialog Opsi Sampul Album (Ganti / Hapus) ────────────────────────────
     if (showCoverOptionsDialog) {
         AlertDialog(
             onDismissRequest = { showCoverOptionsDialog = false },
-            title = { Text("Sampul Album") },
+            title = { Text("Sampul Album Kustom", fontWeight = FontWeight.Bold) },
             text = { Text("Pilih tindakan untuk sampul album lagu '${song.title}':") },
             confirmButton = {
                 TextButton(onClick = {
@@ -526,7 +549,7 @@ fun NowPlayingSheet(
         )
     }
 
-    // Dialog Pengaturan Sleep Timer
+    // ─── Dialog Pengaturan Sleep Timer ───────────────────────────────────────
     if (showSleepTimerDialog) {
         SleepTimerDialog(
             remainingSeconds = playbackState.sleepTimerRemainingSeconds,
@@ -540,6 +563,89 @@ fun NowPlayingSheet(
                 showSleepTimerDialog = false
             }
         )
+    }
+
+    // ─── Dialog Info Lirik ───────────────────────────────────────────────────
+    if (showLyricsDialog) {
+        AlertDialog(
+            onDismissRequest = { showLyricsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        tint = ElectricLime,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Lirik Lagu", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = song.title,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Fitur sinkronisasi lirik otomatis akan tersedia di pembaruan berikutnya.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMuted
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLyricsDialog = false }) {
+                    Text("Tutup", color = ElectricLime)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun NowPlayingActionPill(
+    icon: ImageVector,
+    label: String,
+    isActive: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (isActive) ElectricLimeContainer else Color(0xFF1A1C1A),
+        border = BorderStroke(1.dp, if (isActive) ElectricLime.copy(alpha = 0.5f) else Color(0xFF282B28)),
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isActive) ElectricLime else Color(0xFFCCCCCC),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = if (isActive) ElectricLime else Color(0xFFCCCCCC),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -559,11 +665,11 @@ fun SleepTimerDialog(
                 Icon(
                     imageVector = Icons.Default.Bedtime,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = ElectricLime,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Sleep Timer")
+                Text("Sleep Timer", fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -575,14 +681,14 @@ fun SleepTimerDialog(
                         text = "Timer aktif: %02d:%02d tersisa".format(min, sec),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = ElectricLime
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 } else {
                     Text(
                         text = "Pilih durasi waktu sebelum musik berhenti otomatis:",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
                 }
 
@@ -595,7 +701,8 @@ fun SleepTimerDialog(
                             text = "$minutes Menit",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Start,
+                            color = Color.White
                         )
                     }
                 }
@@ -619,7 +726,7 @@ fun SleepTimerDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Tutup")
+                Text("Tutup", color = ElectricLime)
             }
         }
     )
