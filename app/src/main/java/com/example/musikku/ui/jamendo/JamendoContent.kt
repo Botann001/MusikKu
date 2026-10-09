@@ -92,247 +92,259 @@ fun JamendoContent(
     val genreChips = listOf("Populer", "Pop", "Lo-fi", "Elektronik", "Akustik", "Rock", "Jazz", "Chill")
     var selectedGenre by remember { mutableStateOf("Populer") }
 
-    Column(
+    val displayList = if (state.query.isNotBlank()) state.results else state.popularTracks
+    val sectionTitle = if (searchInput.isNotBlank()) "Hasil pencarian" else "Sedang populer"
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .then(if (showHeader) Modifier.statusBarsPadding() else Modifier)
-            .padding(contentPadding)
+            .then(if (showHeader) Modifier.statusBarsPadding() else Modifier),
+        contentPadding = PaddingValues(
+            top = 6.dp,
+            bottom = contentPadding.calculateBottomPadding() + 80.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // ─── 1. Header (MUSIK LEGAL DARI JAMENDO & Jelajah) Sesuai Image 3 ───────
         if (showHeader) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "MUSIK LEGAL DARI JAMENDO",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    letterSpacing = 1.8.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Jelajah",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    fontSize = 34.sp
-                )
+            item(key = "jamendo_header") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "MUSIK LEGAL DARI JAMENDO",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Jelajah",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 34.sp
+                    )
+                }
             }
         }
 
         // ─── 2. Search Bar Kapsul (Cari jutaan lagu gratis) ──────────────────────
-        TextField(
-            value = searchInput,
-            onValueChange = { searchInput = it },
-            placeholder = { Text("Cari jutaan lagu gratis", color = Color(0xFF7E807E)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Cari",
-                    tint = Color(0xFF7E807E)
-                )
-            },
-            trailingIcon = {
-                if (searchInput.isNotEmpty()) {
-                    IconButton(onClick = {
-                        searchInput = ""
-                        selectedGenre = "Populer"
-                        onSearch("")
-                    }) {
+        item(key = "jamendo_search_bar") {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                TextField(
+                    value = searchInput,
+                    onValueChange = { searchInput = it },
+                    placeholder = { Text("Cari jutaan lagu gratis", color = Color(0xFF7E807E)) },
+                    leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Hapus",
-                            tint = Color.White
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Cari",
+                            tint = Color(0xFF7E807E)
                         )
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(50),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = JetCard,
-                unfocusedContainerColor = JetCard,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = {
-                focusManager.clearFocus()
-                onSearch(searchInput)
-            }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+                    },
+                    trailingIcon = {
+                        if (searchInput.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchInput = ""
+                                selectedGenre = "Populer"
+                                onSearch("")
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Hapus",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(50),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = JetCard,
+                        unfocusedContainerColor = JetCard,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focusManager.clearFocus()
+                        onSearch(searchInput)
+                    }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
         // ─── 3. Genre Chips Kapsul (Populer, Pop, Lo-fi, Elektronik, Akustik) ───
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            genreChips.forEach { genre ->
-                val isSelected = (genre == "Populer" && searchInput.isBlank() && selectedGenre == "Populer") ||
-                        (selectedGenre == genre && searchInput.isNotBlank()) ||
-                        (searchInput.equals(genre, ignoreCase = true))
+        item(key = "jamendo_genre_chips") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                genreChips.forEach { genre ->
+                    val isSelected = (genre == "Populer" && searchInput.isBlank() && selectedGenre == "Populer") ||
+                            (selectedGenre == genre && searchInput.isNotBlank()) ||
+                            (searchInput.equals(genre, ignoreCase = true))
 
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
-                    modifier = Modifier.clickable {
-                        selectedGenre = genre
-                        if (genre == "Populer") {
-                            searchInput = ""
-                            onSearch("")
-                        } else {
-                            searchInput = genre
-                            onSearch(genre)
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
+                        modifier = Modifier.clickable {
+                            selectedGenre = genre
+                            if (genre == "Populer") {
+                                searchInput = ""
+                                onSearch("")
+                            } else {
+                                searchInput = genre
+                                onSearch(genre)
+                            }
                         }
+                    ) {
+                        Text(
+                            text = genre,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
+                        )
                     }
-                ) {
-                    Text(
-                        text = genre,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
-                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
         // ─── 4. Kartu Pengaturan: Unduh hanya lewat Wi-Fi ────────────────────────
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = JetCard),
-            border = BorderStroke(1.dp, Color(0xFF262826)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Unduh hanya lewat Wi-Fi",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Hemat kuota saat mengunduh",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
-                }
+        item(key = "jamendo_wifi_card") {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = JetCard),
+                    border = BorderStroke(1.dp, Color(0xFF262826)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Unduh hanya lewat Wi-Fi",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Hemat kuota saat mengunduh",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
 
-                Switch(
-                    checked = downloadOnlyWifi,
-                    onCheckedChange = onToggleDownloadOnlyWifi,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = OnElectricLime,
-                        checkedTrackColor = ElectricLime,
-                        uncheckedThumbColor = Color(0xFF888888),
-                        uncheckedTrackColor = Color(0xFF2E302E)
-                    )
-                )
+                        Switch(
+                            checked = downloadOnlyWifi,
+                            onCheckedChange = onToggleDownloadOnlyWifi,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = OnElectricLime,
+                                checkedTrackColor = ElectricLime,
+                                uncheckedThumbColor = Color(0xFF888888),
+                                uncheckedTrackColor = Color(0xFF2E302E)
+                            )
+                        )
+                    }
+                }
             }
         }
 
         // Banner Offline jika tidak ada internet
-        AnimatedVisibility(visible = !isOnline) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudOff,
-                        contentDescription = "Offline",
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Mode Offline: Hubungkan ke internet untuk memutar lagu baru.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
+        if (!isOnline) {
+            item(key = "jamendo_offline_banner") {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = "Offline",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Mode Offline: Hubungkan ke internet untuk memutar lagu baru.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        val displayList = if (state.query.isNotBlank()) state.results else state.popularTracks
-        val sectionTitle = if (searchInput.isNotBlank()) "Hasil pencarian" else "Sedang populer"
-
         // ─── 5. Konten Daftar Lagu: Sedang Populer ──────────────────────────────
         when {
             state.isSearching -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ElectricLime)
+                item(key = "jamendo_loading") {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ElectricLime)
+                    }
                 }
             }
 
             state.errorMessage != null && displayList.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Tidak dapat memuat lagu Jamendo",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = state.errorMessage ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                item(key = "jamendo_error") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Tidak dapat memuat lagu Jamendo",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = state.errorMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
 
             else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    item {
-                        Text(
-                            text = sectionTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                        )
-                    }
+                item(key = "jamendo_section_header") {
+                    Text(
+                        text = sectionTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                }
 
                     items(items = displayList, key = { it.id }) { track ->
                         val isPlaying = track.audio != null && track.audio == currentPlayingUri
@@ -382,7 +394,6 @@ fun JamendoContent(
             }
         }
     }
-}
 
 @Composable
 private fun JamendoTrackCard(

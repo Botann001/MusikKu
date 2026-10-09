@@ -103,140 +103,145 @@ fun YouTubeContent(
     )
     var selectedGenre by remember { mutableStateOf("🔥 Trending") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
+    val displayItems = if (state.query.isBlank()) state.trendingTracks else state.results
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            top = 6.dp,
+            bottom = contentPadding.calculateBottomPadding() + 80.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // ─── 1. Search Bar Kapsul Modern ──────────────────────────────────────────
-        TextField(
-            value = searchInput,
-            onValueChange = { searchInput = it },
-            placeholder = { Text("Cari lagu, artis, atau album di YouTube...", color = Color(0xFF7E807E), fontSize = 14.sp) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Cari",
-                    tint = ElectricLime
-                )
-            },
-            trailingIcon = {
-                if (searchInput.isNotEmpty()) {
-                    IconButton(onClick = {
-                        searchInput = ""
-                        selectedGenre = "🔥 Trending"
-                        onSearch("")
-                    }) {
+        item(key = "yt_search_bar") {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                TextField(
+                    value = searchInput,
+                    onValueChange = { searchInput = it },
+                    placeholder = { Text("Cari lagu, artis, atau album di YouTube...", color = Color(0xFF7E807E), fontSize = 14.sp) },
+                    leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Hapus",
-                            tint = Color.White
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Cari",
+                            tint = ElectricLime
                         )
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(50),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = JetCard,
-                unfocusedContainerColor = JetCard,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = {
-                focusManager.clearFocus()
-                onSearch(searchInput)
-            }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+                    },
+                    trailingIcon = {
+                        if (searchInput.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchInput = ""
+                                selectedGenre = "🔥 Trending"
+                                onSearch("")
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Hapus",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(50),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = JetCard,
+                        unfocusedContainerColor = JetCard,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focusManager.clearFocus()
+                        onSearch(searchInput)
+                    }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
         // ─── 2. Genre Chips Kapsul ───────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            genreChips.forEach { genre ->
-                val isSelected = (genre == "🔥 Trending" && searchInput.isBlank() && selectedGenre == "🔥 Trending") ||
-                        (selectedGenre == genre && searchInput.isNotBlank()) ||
-                        (searchInput.equals(genre.removePrefix("🔥 "), ignoreCase = true))
+        item(key = "yt_genre_chips") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                genreChips.forEach { genre ->
+                    val isSelected = (genre == "🔥 Trending" && searchInput.isBlank() && selectedGenre == "🔥 Trending") ||
+                            (selectedGenre == genre && searchInput.isNotBlank()) ||
+                            (searchInput.equals(genre.removePrefix("🔥 "), ignoreCase = true))
 
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
-                    modifier = Modifier.clickable {
-                        selectedGenre = genre
-                        if (genre == "🔥 Trending") {
-                            searchInput = ""
-                            onSearch("")
-                        } else {
-                            val clean = genre.removePrefix("🔥 ")
-                            searchInput = clean
-                            onSearch(clean)
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
+                        modifier = Modifier.clickable {
+                            selectedGenre = genre
+                            if (genre == "🔥 Trending") {
+                                searchInput = ""
+                                onSearch("")
+                            } else {
+                                val clean = genre.removePrefix("🔥 ")
+                                searchInput = clean
+                                onSearch(clean)
+                            }
                         }
+                    ) {
+                        Text(
+                            text = genre,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
                     }
-                ) {
-                    Text(
-                        text = genre,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
         // ─── 3. Offline Warning Banner ───────────────────────────────────────────
         if (!isOnline) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF2C1E1E),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudOff,
-                        contentDescription = null,
-                        tint = Color(0xFFFF5252),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "Perangkat sedang offline. Sambungkan internet untuk memutar streaming YouTube.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFFF8A80)
-                    )
+            item(key = "yt_offline_banner") {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF2C1E1E),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = null,
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Perangkat sedang offline. Sambungkan internet untuk memutar streaming YouTube.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFFF8A80)
+                            )
+                        }
+                    }
                 }
             }
         }
 
         // ─── 4. Main Body: Results / Loading / Empty ─────────────────────────────
-        val displayItems = if (state.query.isBlank()) state.trendingTracks else state.results
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
-            when {
-                state.isSearching -> {
+        when {
+            state.isSearching -> {
+                item(key = "yt_loading") {
                     Column(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -253,11 +258,13 @@ fun YouTubeContent(
                         )
                     }
                 }
+            }
 
-                state.errorMessage != null && displayItems.isEmpty() -> {
+            state.errorMessage != null && displayItems.isEmpty() -> {
+                item(key = "yt_error") {
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .padding(24.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -292,12 +299,14 @@ fun YouTubeContent(
                         }
                     }
                 }
+            }
 
-                displayItems.isEmpty() -> {
+            displayItems.isEmpty() -> {
+                item(key = "yt_empty") {
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
+                            .fillMaxWidth()
+                            .padding(32.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -315,54 +324,46 @@ fun YouTubeContent(
                         )
                     }
                 }
+            }
 
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+            else -> {
+                item(key = "yt_section_header") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (state.query.isBlank()) "Lagu Populer & Trending" else "Hasil Pencarian (\"${state.query}\")",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "${displayItems.size} Lagu",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextMuted
-                                )
-                            }
-                        }
+                        Text(
+                            text = if (state.query.isBlank()) "Lagu Populer & Trending" else "Hasil Pencarian (\"${state.query}\")",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "${displayItems.size} Lagu",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextMuted
+                        )
+                    }
+                }
 
-                        items(displayItems, key = { it.videoId }) { item ->
-                            val isCurrentTrack = currentPlayingTitle != null &&
-                                    (currentPlayingTitle.contains(item.title, ignoreCase = true) ||
-                                            item.title.contains(currentPlayingTitle, ignoreCase = true))
-                            val isResolvingThis = state.isLoadingStreamId == item.videoId
+                items(displayItems, key = { it.videoId }) { item ->
+                    val isCurrentTrack = currentPlayingTitle != null &&
+                            (currentPlayingTitle.contains(item.title, ignoreCase = true) ||
+                                    item.title.contains(currentPlayingTitle, ignoreCase = true))
+                    val isResolvingThis = state.isLoadingStreamId == item.videoId
 
-                            YouTubeTrackCard(
-                                track = item,
-                                isCurrentlyPlaying = isCurrentTrack && isPlaying,
-                                isLoadingStream = isResolvingThis,
-                                onPlayClick = { onPlay(item) },
-                                onAddToQueue = { onAddToQueue(item) },
-                                onAddToPlaylist = { onAddToPlaylist(item) }
-                            )
-                        }
-
-                        item {
-                            Spacer(modifier = Modifier.height(80.dp))
-                        }
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        YouTubeTrackCard(
+                            track = item,
+                            isCurrentlyPlaying = isCurrentTrack && isPlaying,
+                            isLoadingStream = isResolvingThis,
+                            onPlayClick = { onPlay(item) },
+                            onAddToQueue = { onAddToQueue(item) },
+                            onAddToPlaylist = { onAddToPlaylist(item) }
+                        )
                     }
                 }
             }

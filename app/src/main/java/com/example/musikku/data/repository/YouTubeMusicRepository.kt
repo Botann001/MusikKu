@@ -60,7 +60,7 @@ class YouTubeMusicRepository(
                 val endpoint = "$base/api/v1/trending"
                 val items = apiService.getTrending(endpoint = endpoint, type = "music")
                 val validItems = items.filter { it.videoId.isNotBlank() && !it.liveNow && it.lengthSeconds >= 30 }
-                if (validItems.isNotEmpty()) {
+                if (validItems.size >= 8) {
                     return@withContext Result.success(validItems)
                 }
             } catch (e: Exception) {

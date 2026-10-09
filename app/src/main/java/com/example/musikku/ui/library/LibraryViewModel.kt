@@ -264,6 +264,11 @@ class LibraryViewModel(
 
     fun setExploreSourceTab(tab: ExploreSourceTab) {
         _exploreSourceTab.update { tab }
+        if (tab == ExploreSourceTab.JAMENDO && _jamendoState.value.popularTracks.isEmpty()) {
+            loadPopularJamendo()
+        } else if (tab == ExploreSourceTab.YOUTUBE && _youTubeState.value.trendingTracks.isEmpty()) {
+            loadTrendingYouTube()
+        }
     }
 
     fun loadTrendingYouTube() {
