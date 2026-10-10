@@ -24,13 +24,10 @@ class YouTubeMusicRepository(
         private const val TAG = "YouTubeMusicRepo"
 
         /**
-         * Daftar server Invidious terverifikasi yang mendukung API search dan adaptive audio streams.
+         * Server Invidious terverifikasi yang stabil untuk pencarian dan metadata YouTube.
          */
         val INSTANCE_CANDIDATES = listOf(
-            "https://invidious.f5.si",
-            "https://invidious.flokinet.to",
-            "https://invidious.projectsegfau.lt",
-            "https://iv.ggtyler.dev"
+            "https://invidious.f5.si"
         )
     }
 
@@ -38,13 +35,12 @@ class YouTubeMusicRepository(
 
     @Synchronized
     private fun getCurrentInstance(): String {
-        return INSTANCE_CANDIDATES[currentInstanceIndex % INSTANCE_CANDIDATES.size]
+        return INSTANCE_CANDIDATES[0]
     }
 
     @Synchronized
     private fun rotateInstance() {
-        currentInstanceIndex = (currentInstanceIndex + 1) % INSTANCE_CANDIDATES.size
-        Log.w(TAG, "Berpindah ke instance YouTube berikutnya: ${getCurrentInstance()}")
+        currentInstanceIndex = 0
     }
 
     /**

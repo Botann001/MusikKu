@@ -234,6 +234,35 @@ fun YouTubeContent(
             }
         }
 
+        // ─── 3b. Info Notice Banner ──────────────────────────────────────────────
+        item(key = "yt_notice_banner") {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                Surface(
+                    color = JetCard.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "💡",
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Streaming YouTube publik sewaktu-waktu dibatasi oleh Google. Jika terkendala, nikmati jutaan musik bebas hambatan di tab Jamendo.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFAAAAAA),
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
+
         // ─── 4. Main Body: Results / Loading / Empty ─────────────────────────────
         when {
             state.isSearching -> {

@@ -335,7 +335,12 @@ class LibraryViewModel(
             result.onSuccess { song ->
                 musicController.playSongs(listOf(song), 0)
             }.onFailure { error ->
-                musicController.postUserMessage("Gagal memutar audio YouTube: ${error.localizedMessage ?: "Format tidak didukung"}")
+                val msg = if (error.message?.contains("dibatasi") == true || error.message?.contains("403") == true || error.message?.contains("Connect") == true) {
+                    "Lagu '${track.title}' tidak dapat di-stream: server YouTube membatasi akses audio publik. Gunakan tab Jamendo untuk musik streaming & unduh legal yang lancar."
+                } else {
+                    "Gagal memutar audio YouTube: ${error.localizedMessage ?: "Server sedang sibuk"}"
+                }
+                musicController.postUserMessage(msg)
             }
         }
     }
