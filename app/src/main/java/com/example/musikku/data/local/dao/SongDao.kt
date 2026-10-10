@@ -10,17 +10,18 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SongDao {
 
-    /** Ambil semua lagu, urut berdasarkan judul A-Z. */
-    @Query("SELECT * FROM songs ORDER BY title COLLATE NOCASE ASC")
+    /** Ambil semua lagu lokal dan unduhan di perangkat, urut berdasarkan judul A-Z. */
+    @Query("SELECT * FROM songs WHERE source IN ('LOCAL', 'DOWNLOADED') ORDER BY title COLLATE NOCASE ASC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
-    /** Cari lagu berdasarkan judul, artis, atau album. */
+    /** Cari lagu lokal dan unduhan berdasarkan judul, artis, atau album. */
     @Query(
         """
         SELECT * FROM songs
-        WHERE title LIKE '%' || :query || '%'
+        WHERE source IN ('LOCAL', 'DOWNLOADED')
+           AND (title LIKE '%' || :query || '%'
            OR artist LIKE '%' || :query || '%'
-           OR album LIKE '%' || :query || '%'
+           OR album LIKE '%' || :query || '%')
         ORDER BY title COLLATE NOCASE ASC
         """
     )
@@ -57,8 +58,8 @@ interface SongDao {
     @Query("UPDATE songs SET isFavorite = :isFavorite WHERE id = :songId")
     suspend fun updateFavorite(songId: Long, isFavorite: Boolean)
 
-    /** Ambil semua lagu favorit langsung dari tabel songs berdasarkan flag isFavorite. */
-    @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY title COLLATE NOCASE ASC")
+    /** Ambil semua lagu favorit lokal & unduhan langsung dari tabel songs berdasarkan flag isFavorite. */
+    @Query("SELECT * FROM songs WHERE isFavorite = 1 AND source IN ('LOCAL', 'DOWNLOADED') ORDER BY title COLLATE NOCASE ASC")
     fun getFavoriteSongs(): Flow<List<SongEntity>>
 
     /** Ambil semua ID lagu favorit. */
@@ -76,4 +77,8 @@ interface SongDao {
     /** Hapus file audio obrolan seperti WhatsApp yang sebelumnya tersimpan */
     @Query("DELETE FROM songs WHERE source = 'LOCAL' AND (title LIKE 'AUD-%-WA%' OR title LIKE 'PTT-%-WA%' OR title LIKE 'AUD-%' OR title LIKE 'PTT-%' OR (filePath IS NOT NULL AND (filePath LIKE '%WhatsApp%' OR filePath LIKE '%Telegram%')))")
     suspend fun deleteWhatsAppAudios()
+
+    /** Hapus lagu streaming online sementara (YOUTUBE) yang tidak berada di playlist manapun. */
+    @Query("DELETE FROM songs WHERE source = 'YOUTUBE' AND id NOT IN (SELECT songId FROM playlist_songs)")
+    suspend fun deleteOrphanOnlineSongs()
 }

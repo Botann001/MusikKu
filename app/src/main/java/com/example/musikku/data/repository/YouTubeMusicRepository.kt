@@ -28,9 +28,9 @@ class YouTubeMusicRepository(
          */
         val INSTANCE_CANDIDATES = listOf(
             "https://invidious.f5.si",
+            "https://invidious.flokinet.to",
             "https://invidious.projectsegfau.lt",
-            "https://iv.ggtyler.dev",
-            "https://invidious.nerdvpn.de"
+            "https://iv.ggtyler.dev"
         )
     }
 
@@ -119,7 +119,7 @@ class YouTubeMusicRepository(
             val base = getCurrentInstance()
             try {
                 Log.d(TAG, "Mengambil stream audio untuk videoId=$videoId dari $base")
-                val endpoint = "$base/api/v1/videos/$videoId"
+                val endpoint = "$base/api/v1/videos/$videoId?local=true"
                 val details = apiService.getVideoDetails(endpoint)
 
                 // 1. Prioritaskan adaptive format AAC m4a (itag 140)
@@ -138,19 +138,20 @@ class YouTubeMusicRepository(
                     ?: details.formatStreams?.firstOrNull { it.url.isNotBlank() }?.url
 
                 if (!rawStreamUrl.isNullOrBlank()) {
-                    val finalStreamUrl = if (rawStreamUrl.startsWith("/")) {
-                        "$base$rawStreamUrl"
-                    } else {
-                        rawStreamUrl
+                    val finalStreamUrl = when {
+                        rawStreamUrl.startsWith("/") -> "$base$rawStreamUrl"
+                        rawStreamUrl.contains("googlevideo.com") -> {
+                            // Proxy melalui Invidious /videoplayback jika URL googlevideo langsung diblokir (403 Forbidden)
+                            val uri = android.net.Uri.parse(rawStreamUrl)
+                            val query = uri.query
+                            if (!query.isNullOrBlank()) "$base/videoplayback?$query" else rawStreamUrl
+                        }
+                        else -> rawStreamUrl
                     }
 
                     val songEntity = item.toSongEntity(streamUrl = finalStreamUrl)
-                    // Simpan atau perbarui entri lagu di database Room agar bisa disimpan ke playlist lokal
-                    try {
-                        songDao.insertAll(listOf(songEntity))
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Gagal menyimpan entri lagu ke Room: ${e.message}")
-                    }
+                    // PENTING: JANGAN simpan ke songDao saat pemutaran biasa agar tidak mencemari Library koleksi lokal!
+                    // Entri hanya disimpan ke Room jika pengguna secara eksplisit menambahkannya ke sebuah Playlist.
 
                     return@withContext Result.success(songEntity)
                 } else {
@@ -163,6 +164,6 @@ class YouTubeMusicRepository(
             }
         }
 
-        Result.failure(lastException ?: Exception("Gagal memutar audio dari YouTube Music. Silakan coba lagi."))
+        Result.failure(lastException ?: Exception("Streaming YouTube dibatasi oleh YouTube (HTTP 403 / anti-bot). Silakan gunakan tab Jamendo untuk musik streaming & unduh bebas hambatan."))
     }
 }

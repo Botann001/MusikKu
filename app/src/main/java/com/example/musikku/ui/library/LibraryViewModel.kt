@@ -360,6 +360,7 @@ class LibraryViewModel(
             val result = youTubeMusicRepository.resolveAudioStream(track)
             _youTubeState.update { it.copy(isLoadingStreamId = null) }
             result.onSuccess { song ->
+                repository.saveOnlineSongForPlaylist(song)
                 repository.addSongToPlaylist(playlistId, song.id)
                 musicController.postUserMessage("Lagu YouTube ditambahkan ke playlist")
             }.onFailure { error ->

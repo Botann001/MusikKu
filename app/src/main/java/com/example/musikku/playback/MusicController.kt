@@ -115,7 +115,17 @@ class MusicController(private val context: Context) {
         override fun onPlayerError(error: PlaybackException) {
             val current = _playbackState.value.currentSong
             val msg = if (current != null) {
-                "Lagu '${current.title}' tidak dapat diputar (file telah dihapus dari HP atau rusak)."
+                when {
+                    current.source == "YOUTUBE" -> {
+                        "Lagu '${current.title}' dari YouTube tidak dapat diputar (server stream YouTube sedang dibatasi atau anti-bot aktif)."
+                    }
+                    current.source == "JAMENDO" || current.contentUri.startsWith("http") -> {
+                        "Gagal memutar streaming online '${current.title}'. Periksa koneksi internet Anda."
+                    }
+                    else -> {
+                        "Lagu '${current.title}' tidak dapat diputar (file telah dihapus dari HP atau rusak)."
+                    }
+                }
             } else {
                 "Gagal memutar lagu: file tidak ditemukan atau jaringan bermasalah."
             }
@@ -175,7 +185,12 @@ class MusicController(private val context: Context) {
     private fun executePlay(controller: MediaController, songs: List<SongEntity>, startIndex: Int) {
         val song = songs[startIndex]
         if (!isFileAvailable(song)) {
-            _userMessageEvent.tryEmit("Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus).")
+            val notFoundMsg = if (song.source == "YOUTUBE" || song.source == "JAMENDO" || song.contentUri.startsWith("http")) {
+                "Lagu '${song.title}' tidak dapat dimuat dari internet."
+            } else {
+                "Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus)."
+            }
+            _userMessageEvent.tryEmit(notFoundMsg)
             if (songs.size > 1) {
                 val nextIndex = (startIndex + 1) % songs.size
                 val remainingSongs = songs.filterIndexed { idx, _ -> idx != startIndex }
@@ -210,7 +225,12 @@ class MusicController(private val context: Context) {
         if (index in currentPlaylist.indices) {
             val song = currentPlaylist[index]
             if (!isFileAvailable(song)) {
-                _userMessageEvent.tryEmit("Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus).")
+                val notFoundMsg = if (song.source == "YOUTUBE" || song.source == "JAMENDO" || song.contentUri.startsWith("http")) {
+                    "Lagu '${song.title}' tidak dapat dimuat dari internet."
+                } else {
+                    "Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus)."
+                }
+                _userMessageEvent.tryEmit(notFoundMsg)
                 return
             }
             controller.seekToDefaultPosition(index)

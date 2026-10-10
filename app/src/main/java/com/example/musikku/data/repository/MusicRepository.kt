@@ -39,6 +39,8 @@ class MusicRepository(
     suspend fun refreshFromDevice() = withContext(Dispatchers.IO) {
         // Hapus audio obrolan / WhatsApp yang sebelumnya sempat tersimpan
         songDao.deleteWhatsAppAudios()
+        // Bersihkan lagu streaming online sementara agar Library tetap bersih
+        songDao.deleteOrphanOnlineSongs()
 
         val scanned = musicScanner.scanAll()
         // Ambil daftar favorit dan custom album art yang ada agar tidak terhapus saat rescan
@@ -126,6 +128,16 @@ class MusicRepository(
         songDao.deleteSongById(songId)
         favoriteDao.removeFavorite(songId)
         playlistDao.removeSongFromAllPlaylists(songId)
+    }
+
+    /** Simpan lagu streaming online agar dapat dimasukkan ke playlist lokal. */
+    suspend fun saveOnlineSongForPlaylist(song: SongEntity) = withContext(Dispatchers.IO) {
+        songDao.insertAll(listOf(song))
+    }
+
+    /** Bersihkan lagu streaming online yang tidak terkait dengan playlist manapun. */
+    suspend fun cleanOrphanOnlineSongs() = withContext(Dispatchers.IO) {
+        songDao.deleteOrphanOnlineSongs()
     }
 }
 
