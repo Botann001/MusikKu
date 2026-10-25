@@ -58,8 +58,8 @@ interface SongDao {
     @Query("UPDATE songs SET isFavorite = :isFavorite WHERE id = :songId")
     suspend fun updateFavorite(songId: Long, isFavorite: Boolean)
 
-    /** Ambil semua lagu favorit lokal & unduhan langsung dari tabel songs berdasarkan flag isFavorite. */
-    @Query("SELECT * FROM songs WHERE isFavorite = 1 AND source IN ('LOCAL', 'DOWNLOADED') ORDER BY title COLLATE NOCASE ASC")
+    /** Ambil semua lagu favorit (lokal, unduhan, dan YouTube) langsung dari tabel songs berdasarkan flag isFavorite. */
+    @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY title COLLATE NOCASE ASC")
     fun getFavoriteSongs(): Flow<List<SongEntity>>
 
     /** Ambil semua ID lagu favorit. */
@@ -78,7 +78,7 @@ interface SongDao {
     @Query("DELETE FROM songs WHERE source = 'LOCAL' AND (title LIKE 'AUD-%-WA%' OR title LIKE 'PTT-%-WA%' OR title LIKE 'AUD-%' OR title LIKE 'PTT-%' OR (filePath IS NOT NULL AND (filePath LIKE '%WhatsApp%' OR filePath LIKE '%Telegram%')))")
     suspend fun deleteWhatsAppAudios()
 
-    /** Hapus lagu streaming online sementara (YOUTUBE) yang tidak berada di playlist manapun. */
-    @Query("DELETE FROM songs WHERE source = 'YOUTUBE' AND id NOT IN (SELECT songId FROM playlist_songs)")
+    /** Hapus lagu streaming online sementara (YOUTUBE) yang tidak berada di playlist manapun dan bukan favorit. */
+    @Query("DELETE FROM songs WHERE source = 'YOUTUBE' AND isFavorite = 0 AND id NOT IN (SELECT songId FROM playlist_songs)")
     suspend fun deleteOrphanOnlineSongs()
 }

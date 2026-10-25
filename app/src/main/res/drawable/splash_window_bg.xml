@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Solid dark emerald background, matching the app theme -->
+    <item>
+        <color android:color="#0B130E" />
+    </item>
+    <!-- Centered foreground icon with fixed dimensions so it NEVER distorts or stretches -->
+    <item
+        android:width="88dp"
+        android:height="88dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_launcher_foreground" />
+</layer-list>

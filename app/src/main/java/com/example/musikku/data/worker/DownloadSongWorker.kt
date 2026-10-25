@@ -68,9 +68,12 @@ class DownloadSongWorker(
                 )
             }
 
-            // Bersihkan karakter terlarang untuk nama file
+            // Bersihkan karakter terlarang untuk nama file dan tentukan ekstensi file yang sesuai
             val safeFileName = title.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
-            val targetFile = File(musicDir, "${safeFileName}_$songId.mp3")
+            val isMp4OrM4a = downloadUrl.contains("audio/mp4") || downloadUrl.contains("itag=140") ||
+                    downloadUrl.contains("itag=139") || downloadUrl.contains("googlevideo.com")
+            val extension = if (isMp4OrM4a) "m4a" else "mp3"
+            val targetFile = File(musicDir, "${safeFileName}_$songId.$extension")
 
             // Proteksi Path Traversal: Cegah penulisan di luar folder unduhan
             if (!SecurityGuard.validateSafeFilePath(musicDir, targetFile)) {
@@ -82,9 +85,14 @@ class DownloadSongWorker(
             // Unduh stream audio HTTP
             val url = URL(downloadUrl)
             val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15_000
-                readTimeout = 30_000
+                connectTimeout = 20_000
+                readTimeout = 40_000
                 instanceFollowRedirects = true
+                if (downloadUrl.contains("googlevideo.com") || downloadUrl.contains("youtube.com")) {
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/605.1.15")
+                    setRequestProperty("Origin", "https://www.youtube.com")
+                    setRequestProperty("Referer", "https://www.youtube.com/")
+                }
             }
             connection.connect()
 

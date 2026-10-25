@@ -19,3 +19,7 @@ keystore.properties
 *.p12
 *.pem
 *.apk
+*.zip
+test_screen*.png
+scroll_test.png
+release_test.png

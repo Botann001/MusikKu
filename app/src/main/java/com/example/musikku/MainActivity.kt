@@ -14,17 +14,33 @@ import com.example.musikku.ui.library.LibraryScreen
 import com.example.musikku.ui.library.LibraryViewModel
 import com.example.musikku.ui.theme.MusikKuTheme
 
+import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.musikku.data.preferences.AppLanguage
+import com.example.musikku.data.preferences.SettingsRepository
 import com.example.musikku.data.preferences.ThemeMode
 import com.example.musikku.ui.splash.SplashScreen
+import com.example.musikku.util.LocaleHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        val language = runBlocking {
+            SettingsRepository(newBase).appLanguage.first()
+        }
+        super.attachBaseContext(LocaleHelper.applyLocale(newBase, language))
+    }
 
     /**
      * Launcher untuk meminta izin audio dan notifikasi secara bersamaan.
@@ -52,28 +68,53 @@ class MainActivity : ComponentActivity() {
             val themeMode by appContainer.settingsRepository.themeMode
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
 
+            val appLanguage by appContainer.settingsRepository.appLanguage
+                .collectAsStateWithLifecycle(initialValue = null)
+
+            var initialLanguage by remember { mutableStateOf<AppLanguage?>(null) }
+
+            LaunchedEffect(appLanguage) {
+                if (appLanguage != null) {
+                    if (initialLanguage == null) {
+                        initialLanguage = appLanguage
+                    } else if (initialLanguage != appLanguage) {
+                        recreate()
+                    }
+                }
+            }
+
             var showSplash by remember { mutableStateOf(true) }
 
             LaunchedEffect(Unit) {
-                delay(1000L)
+                delay(1400L)
                 showSplash = false
             }
 
             MusikKuTheme(themeMode = themeMode) {
-                if (showSplash) {
-                    SplashScreen()
-                } else {
-                    val viewModel: LibraryViewModel = viewModel(
-                        factory = LibraryViewModel.Factory(
-                            repository = appContainer.musicRepository,
-                            jamendoRepository = appContainer.jamendoRepository,
-                            youTubeMusicRepository = appContainer.youTubeMusicRepository,
-                            settingsRepository = appContainer.settingsRepository,
-                            networkMonitor = appContainer.networkMonitor,
-                            musicController = appContainer.musicController
-                        )
+                val viewModel: LibraryViewModel = viewModel(
+                    factory = LibraryViewModel.Factory(
+                        repository = appContainer.musicRepository,
+                        jamendoRepository = appContainer.jamendoRepository,
+                        youTubeMusicRepository = appContainer.youTubeMusicRepository,
+                        lyricsRepository = appContainer.lyricsRepository,
+                        settingsRepository = appContainer.settingsRepository,
+                        networkMonitor = appContainer.networkMonitor,
+                        musicController = appContainer.musicController
                     )
+                )
+
+                Box(modifier = Modifier.fillMaxSize()) {
                     LibraryScreen(viewModel = viewModel)
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showSplash,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(
+                            animationSpec = androidx.compose.animation.core.tween(500)
+                        )
+                    ) {
+                        SplashScreen()
+                    }
                 }
             }
         }

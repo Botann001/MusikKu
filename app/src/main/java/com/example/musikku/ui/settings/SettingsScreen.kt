@@ -1,6 +1,7 @@
 package com.example.musikku.ui.settings
 
 import android.os.Environment
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SdStorage
@@ -38,12 +41,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -60,8 +66,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.musikku.R
+import com.example.musikku.data.preferences.AppLanguage
 import com.example.musikku.data.preferences.ThemeMode
 import com.example.musikku.security.SecurityGuard
 import kotlinx.coroutines.launch
@@ -70,10 +79,12 @@ import java.io.File
 @Composable
 fun SettingsScreen(
     currentThemeMode: ThemeMode,
+    currentLanguage: AppLanguage,
     downloadOnlyWifi: Boolean,
     sleepTimerSeconds: Long,
     contentPadding: PaddingValues,
     onThemeModeChanged: (ThemeMode) -> Unit,
+    onLanguageChanged: (AppLanguage) -> Unit,
     onToggleDownloadOnlyWifi: (Boolean) -> Unit,
     onSetSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit
@@ -104,7 +115,7 @@ fun SettingsScreen(
     ) {
         item {
             Text(
-                text = "Pengaturan",
+                text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -112,7 +123,139 @@ fun SettingsScreen(
             )
         }
 
-        // ─── 1. Tema Tampilan (Dark / Light / System) ──────────────────────────
+        // ─── 1. Bahasa (Language Selection - Compact Dropdown) ─────────────────
+        item {
+            var languageMenuExpanded by remember { mutableStateOf(false) }
+
+            ElevatedCard(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.settings_language),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_language_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Dropdown Anchor Button (Sleek Frosted Pill)
+                    Box {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { languageMenuExpanded = true }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = currentLanguage.nativeName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Pilih Bahasa",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = languageMenuExpanded,
+                            onDismissRequest = { languageMenuExpanded = false },
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            AppLanguage.values().forEach { lang ->
+                                val isSelected = currentLanguage == lang
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = lang.nativeName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (lang != AppLanguage.SYSTEM && lang.displayName != lang.nativeName) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "(${lang.displayName})",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    },
+                                    trailingIcon = {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        languageMenuExpanded = false
+                                        onLanguageChanged(lang)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── 2. Tema Tampilan (Dark / Light / System) ──────────────────────────
         item {
             ElevatedCard(
                 shape = RoundedCornerShape(20.dp),
@@ -128,7 +271,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Tema Tampilan",
+                            text = stringResource(R.string.settings_theme),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -136,9 +279,9 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     val themeOptions = listOf(
-                        Triple(ThemeMode.SYSTEM, "Ikuti Sistem", Icons.Default.PhoneAndroid),
-                        Triple(ThemeMode.LIGHT, "Tema Terang", Icons.Default.LightMode),
-                        Triple(ThemeMode.DARK, "Tema Gelap", Icons.Default.DarkMode)
+                        Triple(ThemeMode.SYSTEM, stringResource(R.string.settings_theme_system), Icons.Default.PhoneAndroid),
+                        Triple(ThemeMode.LIGHT, stringResource(R.string.settings_theme_light), Icons.Default.LightMode),
+                        Triple(ThemeMode.DARK, stringResource(R.string.settings_theme_dark), Icons.Default.DarkMode)
                     )
 
                     themeOptions.forEach { (mode, label, icon) ->

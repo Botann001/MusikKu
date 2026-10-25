@@ -113,11 +113,12 @@ class MusicController(private val context: Context) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            android.util.Log.e("MusicController", "ExoPlayer error: ${error.errorCodeName} (${error.errorCode}), msg=${error.message}", error)
             val current = _playbackState.value.currentSong
             val msg = if (current != null) {
                 when {
                     current.source == "YOUTUBE" -> {
-                        "Lagu '${current.title}' dari YouTube tidak dapat diputar (server stream YouTube sedang dibatasi atau anti-bot aktif)."
+                        "Lagu '${current.title}' dari YouTube tidak dapat diputar: ${error.errorCodeName} (${error.message ?: "Koneksi bermasalah"})."
                     }
                     current.source == "JAMENDO" || current.contentUri.startsWith("http") -> {
                         "Gagal memutar streaming online '${current.title}'. Periksa koneksi internet Anda."

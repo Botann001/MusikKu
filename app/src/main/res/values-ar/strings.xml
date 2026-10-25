@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MusikKu</string>
+    <string name="playback_channel_name">تشغيل الموسيقى</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">المكتبة</string>
+    <string name="nav_explore">استكشاف</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_theme">مظهر التطبيق</string>
+    <string name="settings_theme_system">اتبع النظام</string>
+    <string name="settings_theme_light">المظهر الفاتح</string>
+    <string name="settings_theme_dark">المظهر الداكن</string>
+    <string name="settings_sleep_timer">مؤقت النوم</string>
+    <string name="settings_sleep_timer_desc">إيقاف الموسيقى تلقائيًا عند النوم.</string>
+    <string name="settings_sleep_timer_active">نشط: %1$02d:%2$02d متبقٍ</string>
+    <string name="settings_download_wifi">التنزيل عبر Wi-Fi فقط</string>
+    <string name="settings_download_wifi_desc">وفّر بيانات الجوال</string>
+    <string name="settings_storage">مساحة التخزين المتاحة</string>
+    <string name="settings_storage_free">%s مساحة حرة</string>
+    <string name="settings_security">درع الأمان</string>
+    <string name="settings_security_desc">مكافحة البرامج الضارة والتجسس</string>
+    <string name="settings_security_safe">%d%% آمن</string>
+    <string name="settings_scan">إعادة الفحص</string>
+    <string name="settings_scanning">جارٍ الفحص…</string>
+    <string name="settings_audit">تفاصيل التدقيق</string>
+    <string name="settings_about">حول MusikKu</string>
+    <string name="settings_cancel">إلغاء</string>
+    <string name="settings_close">إغلاق</string>
+    <string name="settings_language">اللغة</string>
+    <string name="settings_language_desc">اختر لغة عرض التطبيق</string>
+
+    <!-- Security -->
+    <string name="security_report_title">تقرير تدقيق الأمان</string>
+    <string name="security_score">درجة أمان النظام: %d/100</string>
+    <string name="security_files_checked">الملفات المفحوصة: %1$d | المشبوهة: %2$d</string>
+    <string name="security_status_safe">آمن</string>
+    <string name="security_status_warning">تحذير</string>
+    <string name="security_status_danger">خطر</string>
+
+    <!-- Player -->
+    <string name="player_queue">قائمة الانتظار</string>
+    <string name="player_now_playing">قيد التشغيل</string>
+
+    <!-- Library -->
+    <string name="library_songs">الأغاني</string>
+    <string name="library_playlists">قوائم التشغيل</string>
+    <string name="library_favorites">المفضلة</string>
+    <string name="library_search_hint">ابحث عن أغنية…</string>
+
+    <!-- Explore -->
+    <string name="explore_jamendo">Jamendo</string>
+    <string name="explore_youtube">YouTube</string>
+    <string name="explore_search_hint">ابحث عن موسيقى…</string>
+</resources>

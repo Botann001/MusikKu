@@ -6,7 +6,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Busur Headphone (Headband) -->
+    <!-- Busur Headphone (Headband) - Electric Lime to Mint Green Gradient -->
     <path
         android:pathData="M32,54 C32,41.85 41.85,32 54,32 C66.15,32 76,41.85 76,54"
         android:strokeWidth="5"
@@ -19,9 +19,9 @@
                 android:endX="76"
                 android:endY="54"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#FF4081" />
-                <item android:offset="0.5" android:color="#E040FB" />
-                <item android:offset="1.0" android:color="#7C4DFF" />
+                <item android:offset="0.0" android:color="#BAFF5C" />
+                <item android:offset="0.5" android:color="#69F0AE" />
+                <item android:offset="1.0" android:color="#00E676" />
             </gradient>
         </aapt:attr>
     </path>
@@ -29,12 +29,12 @@
     <!-- Ear Cup Kiri -->
     <path
         android:pathData="M27,51 C27,48.8 28.8,47 31,47 L33,47 C35.2,47 37,48.8 37,51 L37,63 C37,65.2 35.2,67 33,67 L31,67 C28.8,67 27,65.2 27,63 Z"
-        android:fillColor="#FF4081" />
+        android:fillColor="#BAFF5C" />
 
     <!-- Ear Cup Kanan -->
     <path
         android:pathData="M71,51 C71,48.8 72.8,47 75,47 L77,47 C79.2,47 81,48.8 81,51 L81,63 C81,65.2 79.2,67 77,67 L75,67 C72.8,67 71,65.2 71,63 Z"
-        android:fillColor="#7C4DFF" />
+        android:fillColor="#00E676" />
 
     <!-- Not Balok Tengah (Music Note) -->
     <path

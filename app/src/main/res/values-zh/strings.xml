@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MusikKu</string>
+    <string name="playback_channel_name">音乐播放</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">音乐库</string>
+    <string name="nav_explore">探索</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_theme">主题</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">浅色主题</string>
+    <string name="settings_theme_dark">深色主题</string>
+    <string name="settings_sleep_timer">睡眠定时器</string>
+    <string name="settings_sleep_timer_desc">入睡时自动停止播放音乐。</string>
+    <string name="settings_sleep_timer_active">激活: 剩余 %1$02d:%2$02d</string>
+    <string name="settings_download_wifi">仅通过 Wi-Fi 下载</string>
+    <string name="settings_download_wifi_desc">节省您的移动数据流量</string>
+    <string name="settings_storage">可用存储空间</string>
+    <string name="settings_storage_free">%s 可用空间</string>
+    <string name="settings_security">安全防护</string>
+    <string name="settings_security_desc">防恶意软件、间谍软件和勒索软件</string>
+    <string name="settings_security_safe">%d%% 安全</string>
+    <string name="settings_scan">重新扫描</string>
+    <string name="settings_scanning">扫描中…</string>
+    <string name="settings_audit">审计详情</string>
+    <string name="settings_about">关于 MusikKu</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_close">关闭</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_desc">选择应用显示语言</string>
+
+    <!-- Security -->
+    <string name="security_report_title">安全审计报告</string>
+    <string name="security_score">系统安全评分：%d/100</string>
+    <string name="security_files_checked">已检查文件：%1$d | 可疑文件：%2$d</string>
+    <string name="security_status_safe">安全</string>
+    <string name="security_status_warning">警告</string>
+    <string name="security_status_danger">危险</string>
+
+    <!-- Player -->
+    <string name="player_queue">播放队列</string>
+    <string name="player_now_playing">正在播放</string>
+
+    <!-- Library -->
+    <string name="library_songs">歌曲</string>
+    <string name="library_playlists">播放列表</string>
+    <string name="library_favorites">收藏</string>
+    <string name="library_search_hint">搜索歌曲…</string>
+
+    <!-- Explore -->
+    <string name="explore_jamendo">Jamendo</string>
+    <string name="explore_youtube">YouTube</string>
+    <string name="explore_search_hint">搜索音乐…</string>
+</resources>

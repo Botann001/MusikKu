@@ -1,4 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MusikKu</string>
     <string name="playback_channel_name">Pemutaran Musik</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">Perpustakaan</string>
+    <string name="nav_explore">Jelajahi</string>
+    <string name="nav_settings">Pengaturan</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_theme">Tema Tampilan</string>
+    <string name="settings_theme_system">Ikuti Sistem</string>
+    <string name="settings_theme_light">Tema Terang</string>
+    <string name="settings_theme_dark">Tema Gelap</string>
+    <string name="settings_sleep_timer">Sleep Timer</string>
+    <string name="settings_sleep_timer_desc">Matikan pemutaran musik secara otomatis saat Anda tertidur.</string>
+    <string name="settings_sleep_timer_active">Aktif: %1$02d:%2$02d tersisa</string>
+    <string name="settings_download_wifi">Unduh Hanya via Wi-Fi</string>
+    <string name="settings_download_wifi_desc">Hemat kuota data seluler Anda</string>
+    <string name="settings_storage">Penyimpanan Tersedia</string>
+    <string name="settings_storage_free">%s ruang kosong di perangkat</string>
+    <string name="settings_security">Perisai Keamanan</string>
+    <string name="settings_security_desc">Anti-Malware, Spyware &amp; Ransomware</string>
+    <string name="settings_security_safe">%d%% Aman</string>
+    <string name="settings_scan">Pindai Ulang</string>
+    <string name="settings_scanning">Memindai…</string>
+    <string name="settings_audit">Rincian Audit</string>
+    <string name="settings_about">Tentang MusikKu</string>
+    <string name="settings_cancel">Batal</string>
+    <string name="settings_close">Tutup</string>
+    <string name="settings_language">Bahasa</string>
+    <string name="settings_language_desc">Pilih bahasa tampilan aplikasi</string>
+
+    <!-- Security -->
+    <string name="security_report_title">Laporan Audit Keamanan</string>
+    <string name="security_score">Skor Keamanan Sistem: %d/100</string>
+    <string name="security_files_checked">Berkas diperiksa: %1$d | Mencurigakan: %2$d</string>
+    <string name="security_status_safe">Aman</string>
+    <string name="security_status_warning">Perhatian</string>
+    <string name="security_status_danger">Bahaya</string>
+
+    <!-- Player -->
+    <string name="player_queue">Antrean</string>
+    <string name="player_now_playing">Sedang Diputar</string>
+
+    <!-- Library -->
+    <string name="library_songs">Lagu</string>
+    <string name="library_playlists">Playlist</string>
+    <string name="library_favorites">Favorit</string>
+    <string name="library_search_hint">Cari lagu…</string>
+
+    <!-- Explore -->
+    <string name="explore_jamendo">Jamendo</string>
+    <string name="explore_youtube">YouTube</string>
+    <string name="explore_search_hint">Cari musik…</string>
 </resources>

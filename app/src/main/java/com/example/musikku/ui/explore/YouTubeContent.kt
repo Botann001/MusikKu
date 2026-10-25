@@ -3,6 +3,7 @@ package com.example.musikku.ui.explore
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,10 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -43,6 +48,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import com.example.musikku.ui.theme.FavoriteRed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +67,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import com.example.musikku.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,9 +79,12 @@ import com.example.musikku.data.remote.youtube.YouTubeSearchItemDto
 import com.example.musikku.ui.common.AlbumArtPlaceholder
 import com.example.musikku.ui.library.YouTubeSearchState
 import com.example.musikku.ui.theme.ElectricLime
+import com.example.musikku.ui.theme.MintGreen
 import com.example.musikku.ui.theme.JetCard
 import com.example.musikku.ui.theme.OnElectricLime
 import com.example.musikku.ui.theme.TextMuted
+import com.example.musikku.data.remote.youtube.songId
+import com.example.musikku.ui.theme.FavoriteRed
 
 @Composable
 fun YouTubeContent(
@@ -81,11 +92,14 @@ fun YouTubeContent(
     currentPlayingTitle: String?,
     isPlaying: Boolean,
     isOnline: Boolean,
+    favoriteSongIds: Set<Long> = emptySet(),
     contentPadding: PaddingValues,
     onSearch: (String) -> Unit,
     onPlay: (YouTubeSearchItemDto) -> Unit,
     onAddToQueue: (YouTubeSearchItemDto) -> Unit,
-    onAddToPlaylist: (YouTubeSearchItemDto) -> Unit
+    onAddToPlaylist: (YouTubeSearchItemDto) -> Unit,
+    onToggleFavorite: (YouTubeSearchItemDto) -> Unit = {},
+    onDownload: (YouTubeSearchItemDto) -> Unit = {}
 ) {
     var searchInput by remember { mutableStateOf(state.query) }
     val focusManager = LocalFocusManager.current
@@ -119,7 +133,7 @@ fun YouTubeContent(
                 TextField(
                     value = searchInput,
                     onValueChange = { searchInput = it },
-                    placeholder = { Text("Cari lagu, artis, atau album di YouTube...", color = Color(0xFF7E807E), fontSize = 14.sp) },
+                    placeholder = { Text(stringResource(R.string.explore_search_hint), color = Color(0xFF7E807E), fontSize = 14.sp) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
@@ -145,8 +159,8 @@ fun YouTubeContent(
                     singleLine = true,
                     shape = RoundedCornerShape(50),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = JetCard,
-                        unfocusedContainerColor = JetCard,
+                        focusedContainerColor = Color.White.copy(alpha = 0.08f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         focusedTextColor = Color.White,
@@ -157,7 +171,9 @@ fun YouTubeContent(
                         focusManager.clearFocus()
                         onSearch(searchInput)
                     }),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(50))
                 )
             }
         }
@@ -178,7 +194,8 @@ fun YouTubeContent(
 
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
+                        color = if (isSelected) Color(0xFFBAFF5C) else Color.White.copy(alpha = 0.08f),
+                        border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                         modifier = Modifier.clickable {
                             selectedGenre = genre
                             if (genre == "🔥 Trending") {
@@ -195,7 +212,7 @@ fun YouTubeContent(
                             text = genre,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
+                            color = if (isSelected) Color.Black else Color.White,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
@@ -383,15 +400,25 @@ fun YouTubeContent(
                             (currentPlayingTitle.contains(item.title, ignoreCase = true) ||
                                     item.title.contains(currentPlayingTitle, ignoreCase = true))
                     val isResolvingThis = state.isLoadingStreamId == item.videoId
+                    val isFav = favoriteSongIds.contains(item.songId)
+                    val isDownloaded = state.downloadedIds.contains(item.songId)
+                    val isDownloading = state.downloadingIds.contains(item.songId)
+                    val progress = state.downloadProgress[item.songId] ?: 0
 
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         YouTubeTrackCard(
                             track = item,
                             isCurrentlyPlaying = isCurrentTrack && isPlaying,
                             isLoadingStream = isResolvingThis,
+                            isFavorite = isFav,
+                            isDownloaded = isDownloaded,
+                            isDownloading = isDownloading,
+                            downloadProgress = progress,
                             onPlayClick = { onPlay(item) },
                             onAddToQueue = { onAddToQueue(item) },
-                            onAddToPlaylist = { onAddToPlaylist(item) }
+                            onAddToPlaylist = { onAddToPlaylist(item) },
+                            onToggleFavorite = { onToggleFavorite(item) },
+                            onDownload = { onDownload(item) }
                         )
                     }
                 }
@@ -405,24 +432,30 @@ fun YouTubeTrackCard(
     track: YouTubeSearchItemDto,
     isCurrentlyPlaying: Boolean,
     isLoadingStream: Boolean,
+    isFavorite: Boolean = false,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
+    downloadProgress: Int = 0,
     onPlayClick: () -> Unit,
     onAddToQueue: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onToggleFavorite: () -> Unit = {},
+    onDownload: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCurrentlyPlaying) Color(0xFF1F281B) else JetCard
+            containerColor = if (isCurrentlyPlaying) Color(0x381C4830) else Color.White.copy(alpha = 0.07f)
         ),
         border = BorderStroke(
-            1.dp,
-            if (isCurrentlyPlaying) ElectricLime else Color(0xFF262826)
+            if (isCurrentlyPlaying) 1.5.dp else 1.dp,
+            if (isCurrentlyPlaying) MintGreen.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.12f)
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable { onPlayClick() }
     ) {
         Row(
@@ -485,7 +518,7 @@ fun YouTubeTrackCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Info Lagu: Judul, Artis, Tag YouTube
+            // Info Lagu: Judul, Artis, Tag YouTube & Downloaded
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -493,7 +526,7 @@ fun YouTubeTrackCard(
                     text = track.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isCurrentlyPlaying) ElectricLime else Color.White,
+                    color = if (isCurrentlyPlaying) MintGreen else Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -525,11 +558,65 @@ fun YouTubeTrackCard(
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
+
+                    // Pill Badge "Offline" jika sudah didownload
+                    if (isDownloaded) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFF1B2E1B)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DownloadDone,
+                                    contentDescription = null,
+                                    tint = ElectricLime,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "Offline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ElectricLime
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // Aksi: Tombol Play / Loading / Menu
-            if (isLoadingStream) {
+            // Tombol Favorit Cepat
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Hapus dari Favorit" else "Tambah ke Favorit",
+                    tint = if (isFavorite) FavoriteRed else Color(0xFF7E807E),
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+
+            // Aksi: Unduh / Loading Stream / Tombol Play
+            if (isDownloading) {
+                Box(
+                    modifier = Modifier.size(36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { if (downloadProgress > 0) downloadProgress / 100f else 0.4f },
+                        color = ElectricLime,
+                        trackColor = Color(0xFF2A2D2A),
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else if (isLoadingStream) {
                 CircularProgressIndicator(
                     color = ElectricLime,
                     strokeWidth = 2.5.dp,
@@ -577,6 +664,49 @@ fun YouTubeTrackCard(
                         onClick = {
                             menuExpanded = false
                             onPlayClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (isFavorite) "Hapus dari Favorit" else "Tambah ke Favorit",
+                                color = Color.White
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isFavorite) FavoriteRed else Color(0xFFCCCCCC)
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleFavorite()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                when {
+                                    isDownloaded -> "Tersimpan di Lokal (Offline)"
+                                    isDownloading -> "Sedang Mengunduh ($downloadProgress%)..."
+                                    else -> "Download Lagu (Simpan Offline)"
+                                },
+                                color = Color.White
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                                contentDescription = null,
+                                tint = if (isDownloaded) ElectricLime else Color(0xFFCCCCCC)
+                            )
+                        },
+                        enabled = !isDownloaded && !isDownloading,
+                        onClick = {
+                            menuExpanded = false
+                            onDownload()
                         }
                     )
                     DropdownMenuItem(

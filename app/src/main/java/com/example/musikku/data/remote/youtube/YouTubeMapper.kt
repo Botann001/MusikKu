@@ -6,10 +6,12 @@ import com.example.musikku.data.local.entity.SongEntity
  * Konversi YouTubeSearchItemDto ke SongEntity milik MusikKu.
  * contentUri akan diisi dengan URL audio stream langsung googlevideo/invidious.
  */
+val YouTubeSearchItemDto.songId: Long
+    get() = (videoId.hashCode().toLong().let { if (it < 0) -it else it })
+
 fun YouTubeSearchItemDto.toSongEntity(streamUrl: String = ""): SongEntity {
-    val safeId = (videoId.hashCode().toLong().let { if (it < 0) -it else it })
     return SongEntity(
-        id = safeId,
+        id = songId,
         title = title.ifBlank { "Lagu YouTube" },
         artist = author?.ifBlank { "YouTube Music" } ?: "YouTube Music",
         album = "YouTube Music",
@@ -20,6 +22,19 @@ fun YouTubeSearchItemDto.toSongEntity(streamUrl: String = ""): SongEntity {
         size = 0L,
         source = "YOUTUBE",
         isFavorite = false,
-        filePath = null
+        filePath = videoId
+    )
+}
+
+/**
+ * Konversi balik dari SongEntity ke YouTubeSearchItemDto untuk keperluan resolusi stream dan download.
+ */
+fun SongEntity.toYouTubeSearchItemDto(): YouTubeSearchItemDto {
+    val vid = filePath?.removePrefix("yt:").orEmpty()
+    return YouTubeSearchItemDto(
+        videoId = vid,
+        title = title,
+        author = artist,
+        lengthSeconds = duration / 1000L
     )
 }

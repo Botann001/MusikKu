@@ -49,3 +49,14 @@
 -keepclassmembernames class kotlinx.coroutines.Dispatchers {
     public static <fields>;
 }
+
+# ─── NewPipeExtractor & Rhino ──────────────────────────────────────────────────
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.**
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn jdk.dynalink.**
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+

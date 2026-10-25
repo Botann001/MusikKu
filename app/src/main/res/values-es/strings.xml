@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MusikKu</string>
+    <string name="playback_channel_name">Reproducción de música</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">Biblioteca</string>
+    <string name="nav_explore">Explorar</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_theme">Tema visual</string>
+    <string name="settings_theme_system">Seguir el sistema</string>
+    <string name="settings_theme_light">Tema claro</string>
+    <string name="settings_theme_dark">Tema oscuro</string>
+    <string name="settings_sleep_timer">Temporizador de sueño</string>
+    <string name="settings_sleep_timer_desc">Detiene la música automáticamente al dormirte.</string>
+    <string name="settings_sleep_timer_active">Activo: %1$02d:%2$02d restantes</string>
+    <string name="settings_download_wifi">Descargar solo por Wi-Fi</string>
+    <string name="settings_download_wifi_desc">Ahorra datos móviles</string>
+    <string name="settings_storage">Almacenamiento disponible</string>
+    <string name="settings_storage_free">%s de espacio libre</string>
+    <string name="settings_security">Escudo de seguridad</string>
+    <string name="settings_security_desc">Anti-malware, spyware y ransomware</string>
+    <string name="settings_security_safe">%d%% seguro</string>
+    <string name="settings_scan">Volver a escanear</string>
+    <string name="settings_scanning">Escaneando…</string>
+    <string name="settings_audit">Detalles de auditoría</string>
+    <string name="settings_about">Acerca de MusikKu</string>
+    <string name="settings_cancel">Cancelar</string>
+    <string name="settings_close">Cerrar</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_desc">Elige el idioma de la aplicación</string>
+
+    <!-- Security -->
+    <string name="security_report_title">Informe de auditoría de seguridad</string>
+    <string name="security_score">Puntuación de seguridad: %d/100</string>
+    <string name="security_files_checked">Archivos verificados: %1$d | Sospechosos: %2$d</string>
+    <string name="security_status_safe">Seguro</string>
+    <string name="security_status_warning">Advertencia</string>
+    <string name="security_status_danger">Peligro</string>
+
+    <!-- Player -->
+    <string name="player_queue">Cola</string>
+    <string name="player_now_playing">Reproduciendo ahora</string>
+
+    <!-- Library -->
+    <string name="library_songs">Canciones</string>
+    <string name="library_playlists">Listas de reproducción</string>
+    <string name="library_favorites">Favoritos</string>
+    <string name="library_search_hint">Buscar canciones…</string>
+
+    <!-- Explore -->
+    <string name="explore_jamendo">Jamendo</string>
+    <string name="explore_youtube">YouTube</string>
+    <string name="explore_search_hint">Buscar música…</string>
+</resources>

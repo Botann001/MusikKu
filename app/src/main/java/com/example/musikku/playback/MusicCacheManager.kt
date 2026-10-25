@@ -1,11 +1,15 @@
 package com.example.musikku.playback
 
 import android.content.Context
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -40,17 +44,19 @@ object MusicCacheManager {
 
     /**
      * Membangun MediaSourceFactory yang dibungkus oleh CacheDataSource.Factory.
-     * Secara otomatis meng-cache audio streaming HTTP dari Jamendo ke SimpleCache.
+     * Secara otomatis meng-cache audio streaming HTTP dari Jamendo & YouTube ke SimpleCache,
+     * serta menyuntikkan header yang kompatibel untuk streaming audio YouTube.
      */
     fun createMediaSourceFactory(context: Context): DefaultMediaSourceFactory {
         val cache = getCache(context)
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        val baseHttpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0")
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(20_000)
+            .setConnectTimeoutMs(20_000)
+            .setReadTimeoutMs(25_000)
 
-        val upstreamFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+        val youtubeAwareHttpFactory = YouTubeAwareDataSourceFactory(baseHttpDataSourceFactory)
+        val upstreamFactory = DefaultDataSource.Factory(context, youtubeAwareHttpFactory)
 
         val cacheDataSourceFactory = CacheDataSource.Factory()
             .setCache(cache)
@@ -59,5 +65,67 @@ object MusicCacheManager {
 
         return DefaultMediaSourceFactory(context)
             .setDataSourceFactory(cacheDataSourceFactory)
+    }
+}
+
+/**
+ * DataSource yang secara dinamis menyesuaikan header HTTP saat melakukan streaming dari server YouTube (googlevideo.com).
+ * Menambahkan Origin, Referer, serta User-Agent yang sesuai dengan jenis stream (misal visionOS)
+ * agar tidak diblokir oleh anti-bot atau pembatasan server Google Video (HTTP 403 Forbidden).
+ */
+@OptIn(UnstableApi::class)
+class YouTubeAwareDataSource(
+    private val delegate: DataSource
+) : DataSource {
+
+    override fun addTransferListener(transferListener: TransferListener) {
+        delegate.addTransferListener(transferListener)
+    }
+
+    override fun open(dataSpec: DataSpec): Long {
+        val uriStr = dataSpec.uri.toString()
+        val isYouTube = uriStr.contains("googlevideo.com") || uriStr.contains("youtube.com")
+
+        val targetSpec = if (isYouTube) {
+            val headers = HashMap(dataSpec.httpRequestHeaders)
+            headers["Origin"] = "https://www.youtube.com"
+            headers["Referer"] = "https://www.youtube.com/"
+            if (uriStr.contains("c=VISIONOS") || uriStr.contains("client=VISIONOS")) {
+                headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/605.1.15"
+            }
+            dataSpec.buildUpon().setHttpRequestHeaders(headers).build()
+        } else {
+            dataSpec
+        }
+
+        return delegate.open(targetSpec)
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        return delegate.read(buffer, offset, length)
+    }
+
+    override fun getUri(): Uri? {
+        return delegate.uri
+    }
+
+    override fun getResponseHeaders(): Map<String, List<String>> {
+        return delegate.responseHeaders
+    }
+
+    override fun close() {
+        delegate.close()
+    }
+}
+
+/**
+ * Factory untuk membuat instance YouTubeAwareDataSource.
+ */
+@OptIn(UnstableApi::class)
+class YouTubeAwareDataSourceFactory(
+    private val baseFactory: DataSource.Factory
+) : DataSource.Factory {
+    override fun createDataSource(): DataSource {
+        return YouTubeAwareDataSource(baseFactory.createDataSource())
     }
 }

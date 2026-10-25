@@ -41,6 +41,16 @@ val TextDisabled = Color(0xFF484B48)
 val ErrorRed = Color(0xFFFF5252)
 val FavoriteRed = Color(0xFFFF6B6B)
 
+// Frosted Glass & Translucent Tokens (Liquid Glassmorphism)
+val MintGreen = Color(0xFF67E8A6)
+val GlassSurface = Color(0x18FFFFFF) // ~9.5% white for cards
+val GlassSurfaceDark = Color(0x12FFFFFF) // ~7% white
+val GlassBorder = Color(0x24FFFFFF) // ~14% white border
+val GlassBorderSubtle = Color(0x1AFFFFFF) // ~10% white border
+val GlassEmeraldPill = Color(0xD9102219) // ~85% opacity dark emerald
+val GlassEmeraldActive = Color(0x381C4830) // ~22% opacity emerald active background
+val GlassActiveBorder = Color(0xD967E8A6) // ~85% opacity mint green active border
+
 // Light Theme Palette
 val EmeraldLightPrimary = Color(0xFF4C7D08)
 val EmeraldLightBg = Color(0xFFF7FAF5)

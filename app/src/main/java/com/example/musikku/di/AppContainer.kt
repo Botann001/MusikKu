@@ -84,9 +84,14 @@ class AppContainer(context: Context) {
         clientId = com.example.musikku.BuildConfig.JAMENDO_CLIENT_ID
     )
 
+    // Manajer instance Invidious cerdas — dynamic fetch, health-check, dan failover otomatis
+    val invidiousInstanceManager = com.example.musikku.data.remote.youtube.InvidiousInstanceManager(
+        context = context.applicationContext
+    )
+
     // Konfigurasi Retrofit untuk Invidious / YouTube Music API
     val youTubeApiService: com.example.musikku.data.remote.youtube.YouTubeApiService = Retrofit.Builder()
-        .baseUrl("https://invidious.f5.si/")
+        .baseUrl("https://inv.nadeko.net/")
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
@@ -95,6 +100,31 @@ class AppContainer(context: Context) {
     val youTubeMusicRepository = com.example.musikku.data.repository.YouTubeMusicRepository(
         context = context.applicationContext,
         apiService = youTubeApiService,
-        songDao = database.songDao()
+        songDao = database.songDao(),
+        settingsRepository = settingsRepository,
+        instanceManager = invidiousInstanceManager
     )
+
+    // Retrofit untuk LRCLIB API (Lirik berjalan sinkron)
+    val lrcLibApiService: com.example.musikku.data.remote.lyrics.LrcLibApiService = Retrofit.Builder()
+        .baseUrl(com.example.musikku.data.remote.lyrics.LrcLibApiService.BASE_URL)
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(com.example.musikku.data.remote.lyrics.LrcLibApiService::class.java)
+
+    val lyricsRepository = com.example.musikku.data.repository.LyricsRepository(
+        apiService = lrcLibApiService
+    )
+
+    init {
+        try {
+            org.schabi.newpipe.extractor.NewPipe.init(
+                com.example.musikku.data.remote.youtube.NewPipeDownloader()
+            )
+            android.util.Log.d("AppContainer", "NewPipeExtractor berhasil diinisialisasi")
+        } catch (e: Exception) {
+            android.util.Log.e("AppContainer", "Gagal inisialisasi NewPipeExtractor: ${e.message}")
+        }
+    }
 }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MusikKu</string>
+    <string name="playback_channel_name">Lecture musicale</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">Bibliothèque</string>
+    <string name="nav_explore">Explorer</string>
+    <string name="nav_settings">Paramètres</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_theme">Thème visuel</string>
+    <string name="settings_theme_system">Suivre le système</string>
+    <string name="settings_theme_light">Thème clair</string>
+    <string name="settings_theme_dark">Thème sombre</string>
+    <string name="settings_sleep_timer">Minuterie de sommeil</string>
+    <string name="settings_sleep_timer_desc">Arrêt automatique de la musique lors de l\'endormissement.</string>
+    <string name="settings_sleep_timer_active">Actif : %1$02d:%2$02d restant</string>
+    <string name="settings_download_wifi">Télécharger via Wi-Fi uniquement</string>
+    <string name="settings_download_wifi_desc">Économisez vos données mobiles</string>
+    <string name="settings_storage">Stockage disponible</string>
+    <string name="settings_storage_free">%s d\'espace libre</string>
+    <string name="settings_security">Bouclier de sécurité</string>
+    <string name="settings_security_desc">Anti-malware, spyware et ransomware</string>
+    <string name="settings_security_safe">%d%% sécurisé</string>
+    <string name="settings_scan">Relancer l\'analyse</string>
+    <string name="settings_scanning">Analyse en cours…</string>
+    <string name="settings_audit">Détails d\'audit</string>
+    <string name="settings_about">À propos de MusikKu</string>
+    <string name="settings_cancel">Annuler</string>
+    <string name="settings_close">Fermer</string>
+    <string name="settings_language">Langue</string>
+    <string name="settings_language_desc">Choisissez la langue d\'affichage</string>
+
+    <!-- Security -->
+    <string name="security_report_title">Rapport d\'audit de sécurité</string>
+    <string name="security_score">Score de sécurité système : %d/100</string>
+    <string name="security_files_checked">Fichiers vérifiés : %1$d | Suspects : %2$d</string>
+    <string name="security_status_safe">Sûr</string>
+    <string name="security_status_warning">Avertissement</string>
+    <string name="security_status_danger">Danger</string>
+
+    <!-- Player -->
+    <string name="player_queue">File d\'attente</string>
+    <string name="player_now_playing">Lecture en cours</string>
+
+    <!-- Library -->
+    <string name="library_songs">Chansons</string>
+    <string name="library_playlists">Listes de lecture</string>
+    <string name="library_favorites">Favoris</string>
+    <string name="library_search_hint">Rechercher des chansons…</string>
+
+    <!-- Explore -->
+    <string name="explore_jamendo">Jamendo</string>
+    <string name="explore_youtube">YouTube</string>
+    <string name="explore_search_hint">Rechercher de la musique…</string>
+</resources>

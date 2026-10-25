@@ -9,6 +9,7 @@ import com.example.musikku.data.local.entity.PlaylistEntity
 import com.example.musikku.data.local.entity.PlaylistSongEntity
 import com.example.musikku.data.local.entity.SongEntity
 import com.example.musikku.data.scanner.MusicScanner
+import com.example.musikku.data.remote.youtube.toSongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -74,7 +75,16 @@ class MusicRepository(
     fun isFavorite(songId: Long): Flow<Boolean> =
         songDao.isFavorite(songId).map { it == true }
 
-    suspend fun toggleFavorite(songId: Long) = withContext(Dispatchers.IO) {
+    suspend fun toggleFavorite(songId: Long, fallbackSong: SongEntity? = null) = withContext(Dispatchers.IO) {
+        val existingSong = songDao.getSongById(songId)
+        if (existingSong == null && fallbackSong != null) {
+            // Lagu online (YouTube/Jamendo) belum tersimpan di database lokal, simpan sebagai favorit
+            val favSong = fallbackSong.copy(isFavorite = true)
+            songDao.insertAll(listOf(favSong))
+            favoriteDao.addFavorite(FavoriteEntity(songId = songId))
+            return@withContext
+        }
+
         val isFav = songDao.getFavoriteSongIds().first().contains(songId)
         val newStatus = !isFav
         // Perbarui flag favorit di tabel songs
@@ -84,6 +94,25 @@ class MusicRepository(
             favoriteDao.addFavorite(FavoriteEntity(songId = songId))
         } else {
             favoriteDao.removeFavorite(songId)
+            // Bersihkan lagu online yang tidak berada di playlist dan bukan favorit lagi
+            if (existingSong?.source == "YOUTUBE") {
+                songDao.deleteOrphanOnlineSongs()
+            }
+        }
+    }
+
+    /**
+     * Menambahkan atau menghapus lagu dari hasil pencarian YouTube ke daftar Favorit.
+     */
+    suspend fun toggleYouTubeFavorite(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto) = withContext(Dispatchers.IO) {
+        val safeId = (track.videoId.hashCode().toLong().let { if (it < 0) -it else it })
+        val existing = songDao.getSongById(safeId)
+        if (existing == null) {
+            val song = track.toSongEntity().copy(isFavorite = true)
+            songDao.insertAll(listOf(song))
+            favoriteDao.addFavorite(FavoriteEntity(songId = safeId))
+        } else {
+            toggleFavorite(safeId, existing)
         }
     }
 

@@ -2,6 +2,7 @@ package com.example.musikku.ui.library
 
 import com.example.musikku.data.local.dao.PlaylistWithCount
 import com.example.musikku.data.local.entity.SongEntity
+import com.example.musikku.data.preferences.AppLanguage
 import com.example.musikku.data.preferences.ThemeMode
 import com.example.musikku.data.remote.dto.JamendoTrackDto
 
@@ -30,7 +31,10 @@ data class YouTubeSearchState(
     val trendingTracks: List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> = emptyList(),
     val isSearching: Boolean = false,
     val isLoadingStreamId: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val downloadingIds: Set<Long> = emptySet(),
+    val downloadProgress: Map<Long, Int> = emptyMap(),
+    val downloadedIds: Set<Long> = emptySet()
 )
 
 data class JamendoSearchState(
@@ -58,6 +62,7 @@ data class LibraryUiState(
     val isOnline: Boolean = true,
     val downloadOnlyWifi: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
     val isLoading: Boolean = true,
     val isEmpty: Boolean = false

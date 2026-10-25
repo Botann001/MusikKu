@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.musikku.data.local.entity.SongEntity
+import com.example.musikku.data.preferences.AppLanguage
 import com.example.musikku.data.preferences.SettingsRepository
 import com.example.musikku.data.preferences.ThemeMode
 import com.example.musikku.data.remote.dto.JamendoTrackDto
@@ -26,14 +27,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.content.Context
 import android.net.Uri
+import com.example.musikku.data.remote.youtube.toYouTubeSearchItemDto
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.io.FileOutputStream
+
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(
     private val repository: MusicRepository,
     val jamendoRepository: JamendoRepository,
     val youTubeMusicRepository: com.example.musikku.data.repository.YouTubeMusicRepository,
+    val lyricsRepository: com.example.musikku.data.repository.LyricsRepository,
     val settingsRepository: SettingsRepository,
     val networkMonitor: NetworkMonitor,
     val musicController: MusicController
@@ -80,7 +87,8 @@ class LibraryViewModel(
         val isLoading: Boolean,
         val isOnline: Boolean,
         val downloadOnlyWifi: Boolean,
-        val themeMode: ThemeMode
+        val themeMode: ThemeMode,
+        val appLanguage: AppLanguage
     )
 
     private val tabQueryFlow = combine(
@@ -90,8 +98,13 @@ class LibraryViewModel(
         combine(_jamendoState, _sortOrder, _isLoading) { jamendo, sort, loading ->
             listOf(jamendo, sort, loading)
         },
-        combine(networkMonitor.isOnline, settingsRepository.downloadOnlyWifi, settingsRepository.themeMode) { online, wifiOnly, theme ->
-            listOf(online, wifiOnly, theme)
+        combine(
+            networkMonitor.isOnline,
+            settingsRepository.downloadOnlyWifi,
+            settingsRepository.themeMode,
+            settingsRepository.appLanguage
+        ) { online, wifiOnly, theme, lang ->
+            listOf(online, wifiOnly, theme, lang)
         }
     ) { list1, list2, list3 ->
         @Suppress("UNCHECKED_CAST")
@@ -105,7 +118,8 @@ class LibraryViewModel(
             isLoading = list2[2] as Boolean,
             isOnline = list3[0] as Boolean,
             downloadOnlyWifi = list3[1] as Boolean,
-            themeMode = list3[2] as ThemeMode
+            themeMode = list3[2] as ThemeMode,
+            appLanguage = list3[3] as AppLanguage
         )
     }
 
@@ -133,6 +147,7 @@ class LibraryViewModel(
             isOnline = tabState.isOnline,
             downloadOnlyWifi = tabState.downloadOnlyWifi,
             themeMode = tabState.themeMode,
+            appLanguage = tabState.appLanguage,
             sortOrder = tabState.sortOrder,
             isLoading = tabState.isLoading,
             isEmpty = !tabState.isLoading && when (tabState.tab) {
@@ -153,26 +168,69 @@ class LibraryViewModel(
     /** State pemutaran musik lengkap dari MusicController */
     val playbackState: StateFlow<PlaybackState> = musicController.playbackState
 
+    /** State lirik berjalan sinkron (karaoke) dari LRCLIB */
+    private val _lyricsState = MutableStateFlow<com.example.musikku.data.remote.lyrics.LyricsUiState>(
+        com.example.musikku.data.remote.lyrics.LyricsUiState.Idle
+    )
+    val lyricsState: StateFlow<com.example.musikku.data.remote.lyrics.LyricsUiState> = _lyricsState.asStateFlow()
+
     init {
         refreshLibrary()
+
+        // Pantau pergantian lagu dan muat lirik otomatis dari LRCLIB
+        viewModelScope.launch {
+            playbackState
+                .map { it.currentSong }
+                .distinctUntilChangedBy { it?.id }
+                .collect { song ->
+                    if (song != null) {
+                        fetchLyrics(song)
+                    } else {
+                        _lyricsState.value = com.example.musikku.data.remote.lyrics.LyricsUiState.Idle
+                    }
+                }
+        }
 
         // Pantau progres unduhan dari WorkManager
         viewModelScope.launch {
             jamendoRepository.downloadProgressMap.collect { progressMap ->
                 _jamendoState.update { it.copy(downloadProgress = progressMap) }
+                _youTubeState.update { it.copy(downloadProgress = progressMap) }
             }
         }
 
         // Pantau ID lagu-lagu yang telah terunduh ke Room
         viewModelScope.launch {
             jamendoRepository.downloadedSongIds.collect { downloadedIds ->
-                _jamendoState.update { it.copy(downloadedIds = downloadedIds.toSet()) }
+                val idSet = downloadedIds.toSet()
+                _jamendoState.update { it.copy(downloadedIds = idSet) }
+                _youTubeState.update { it.copy(downloadedIds = idSet) }
             }
         }
 
         // Muat lagu populer awal untuk Jamendo dan YouTube Music
         loadPopularJamendo()
         loadTrendingYouTube()
+    }
+
+    /** Mengambil lirik lagu dari LRCLIB */
+    fun fetchLyrics(song: SongEntity? = playbackState.value.currentSong) {
+        val current = song ?: return
+        viewModelScope.launch {
+            _lyricsState.value = com.example.musikku.data.remote.lyrics.LyricsUiState.Loading
+            try {
+                val result = lyricsRepository.getLyrics(
+                    title = current.title,
+                    artist = current.artist,
+                    durationMs = current.duration
+                )
+                _lyricsState.value = result
+            } catch (e: Exception) {
+                _lyricsState.value = com.example.musikku.data.remote.lyrics.LyricsUiState.Error(
+                    e.localizedMessage ?: "Gagal memuat lirik dari LRCLIB"
+                )
+            }
+        }
     }
 
     fun selectTab(tab: LibraryTab) {
@@ -335,8 +393,9 @@ class LibraryViewModel(
             result.onSuccess { song ->
                 musicController.playSongs(listOf(song), 0)
             }.onFailure { error ->
-                val msg = if (error.message?.contains("dibatasi") == true || error.message?.contains("403") == true || error.message?.contains("Connect") == true) {
-                    "Lagu '${track.title}' tidak dapat di-stream: server YouTube membatasi akses audio publik. Gunakan tab Jamendo untuk musik streaming & unduh legal yang lancar."
+                val errorMsg = error.message.orEmpty()
+                val msg = if (errorMsg.contains("dibatasi") || errorMsg.contains("diblokir") || errorMsg.contains("PO-Token") || errorMsg.contains("403") || errorMsg.contains("500") || errorMsg.contains("Connect")) {
+                    "Lagu '${track.title}' tidak dapat diputar: YouTube membatasi streaming audio publik (PO-Token/500). Silakan gunakan tab Jamendo."
                 } else {
                     "Gagal memutar audio YouTube: ${error.localizedMessage ?: "Server sedang sibuk"}"
                 }
@@ -371,6 +430,52 @@ class LibraryViewModel(
             }.onFailure { error ->
                 musicController.postUserMessage("Gagal menambahkan ke playlist: ${error.localizedMessage}")
             }
+        }
+    }
+
+    /**
+     * Mengunduh audio YouTube di latar belakang via WorkManager agar tersimpan secara lokal dan dapat diputar offline.
+     */
+    fun downloadYouTubeTrack(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto) {
+        viewModelScope.launch {
+            val safeId = (track.videoId.hashCode().toLong().let { if (it < 0) -it else it })
+            _youTubeState.update { it.copy(downloadingIds = it.downloadingIds + safeId) }
+            musicController.postUserMessage("Menyiapkan unduhan '${track.title}'...")
+            val result = youTubeMusicRepository.downloadTrack(track)
+            result.onSuccess {
+                musicController.postUserMessage("Mulai mengunduh '${track.title}'...")
+            }.onFailure { err ->
+                _youTubeState.update { it.copy(downloadingIds = it.downloadingIds - safeId) }
+                musicController.postUserMessage("Gagal mengunduh: ${err.localizedMessage ?: "Stream tidak tersedia"}")
+            }
+        }
+    }
+
+    /**
+     * Mengunduh lagu yang sedang diputar di NowPlayingSheet (baik YouTube maupun Jamendo).
+     */
+    fun downloadCurrentPlayingSong() {
+        val current = musicController.playbackState.value.currentSong ?: return
+        if (current.source == "DOWNLOADED" || current.source == "LOCAL") {
+            musicController.postUserMessage("Lagu sudah tersimpan offline di HP")
+            return
+        }
+        if (current.source == "YOUTUBE") {
+            val trackDto = current.toYouTubeSearchItemDto()
+            downloadYouTubeTrack(trackDto)
+        } else if (current.source == "JAMENDO") {
+            val trackDto = JamendoTrackDto(
+                id = current.id.toString(),
+                name = current.title,
+                duration = current.duration / 1000L,
+                artistName = current.artist,
+                albumName = current.album,
+                albumImage = current.albumArtUri,
+                audio = current.contentUri,
+                audioDownload = current.contentUri,
+                image = current.albumArtUri
+            )
+            downloadJamendoTrack(trackDto)
         }
     }
 
@@ -444,6 +549,15 @@ class LibraryViewModel(
     }
 
     /**
+     * Ubah bahasa tampilan aplikasi.
+     */
+    fun setAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            settingsRepository.setAppLanguage(language)
+        }
+    }
+
+    /**
      * Atur Sleep Timer dalam menit (15, 30, 45, 60, dll).
      */
     fun setSleepTimer(minutes: Int) {
@@ -471,6 +585,35 @@ class LibraryViewModel(
             LibraryTab.PLAYLISTS, LibraryTab.JAMENDO -> uiState.value.songs
         }
         val startIndex = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+
+        // Jika lagu YouTube streaming diputar dari Favorit/Playlist dan URL stream sudah expired, refresh otomatis
+        if (song.source == "YOUTUBE") {
+            val isExpired = try {
+                val exp = Uri.parse(song.contentUri).getQueryParameter("expire")?.toLongOrNull()
+                exp != null && (System.currentTimeMillis() / 1000L) >= (exp - 60)
+            } catch (_: Exception) {
+                false
+            }
+            if (isExpired || song.contentUri.isBlank()) {
+                viewModelScope.launch {
+                    val trackDto = song.toYouTubeSearchItemDto()
+                    if (trackDto.videoId.isNotBlank()) {
+                        val result = youTubeMusicRepository.resolveAudioStream(trackDto)
+                        result.onSuccess { freshSong ->
+                            repository.saveOnlineSongForPlaylist(freshSong.copy(isFavorite = song.isFavorite))
+                            val updatedPlaylist = playlist.map { if (it.id == freshSong.id) freshSong else it }
+                            musicController.playSongs(updatedPlaylist, startIndex)
+                        }.onFailure {
+                            musicController.playSongs(playlist, startIndex)
+                        }
+                        return@launch
+                    }
+                    musicController.playSongs(playlist, startIndex)
+                }
+                return
+            }
+        }
+
         musicController.playSongs(playlist, startIndex)
     }
 
@@ -514,7 +657,19 @@ class LibraryViewModel(
 
     fun toggleFavorite(songId: Long) {
         viewModelScope.launch {
-            repository.toggleFavorite(songId)
+            val current = musicController.playbackState.value.currentSong
+            val fallback = if (current?.id == songId) current else null
+            repository.toggleFavorite(songId, fallback)
+        }
+    }
+
+    fun toggleYouTubeFavorite(track: com.example.musikku.data.remote.youtube.YouTubeSearchItemDto) {
+        viewModelScope.launch {
+            repository.toggleYouTubeFavorite(track)
+            val safeId = (track.videoId.hashCode().toLong().let { if (it < 0) -it else it })
+            val isNowFav = repository.favoriteSongIds.first().contains(safeId)
+            val msg = if (isNowFav) "Lagu ditambahkan ke Favorit" else "Lagu dihapus dari Favorit"
+            musicController.postUserMessage(msg)
         }
     }
 
@@ -603,6 +758,7 @@ class LibraryViewModel(
         private val repository: MusicRepository,
         private val jamendoRepository: JamendoRepository,
         private val youTubeMusicRepository: com.example.musikku.data.repository.YouTubeMusicRepository,
+        private val lyricsRepository: com.example.musikku.data.repository.LyricsRepository,
         private val settingsRepository: SettingsRepository,
         private val networkMonitor: NetworkMonitor,
         private val musicController: MusicController
@@ -613,6 +769,7 @@ class LibraryViewModel(
                 repository = repository,
                 jamendoRepository = jamendoRepository,
                 youTubeMusicRepository = youTubeMusicRepository,
+                lyricsRepository = lyricsRepository,
                 settingsRepository = settingsRepository,
                 networkMonitor = networkMonitor,
                 musicController = musicController

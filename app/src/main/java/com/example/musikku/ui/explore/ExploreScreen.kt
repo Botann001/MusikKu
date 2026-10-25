@@ -1,6 +1,7 @@
 package com.example.musikku.ui.explore
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.example.musikku.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,11 +50,14 @@ fun ExploreScreen(
     isPlaying: Boolean,
     isOnline: Boolean,
     downloadOnlyWifi: Boolean,
+    favoriteSongIds: Set<Long> = emptySet(),
     contentPadding: PaddingValues,
     onYouTubeSearch: (String) -> Unit,
     onYouTubePlay: (YouTubeSearchItemDto) -> Unit,
     onYouTubeAddToQueue: (YouTubeSearchItemDto) -> Unit,
     onYouTubeAddToPlaylist: (YouTubeSearchItemDto) -> Unit,
+    onYouTubeToggleFavorite: (YouTubeSearchItemDto) -> Unit = {},
+    onYouTubeDownload: (YouTubeSearchItemDto) -> Unit = {},
     onJamendoSearch: (String) -> Unit,
     onJamendoStream: (JamendoTrackDto) -> Unit,
     onJamendoDownload: (JamendoTrackDto) -> Unit,
@@ -78,7 +84,7 @@ fun ExploreScreen(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Jelajah",
+                text = stringResource(R.string.nav_explore),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
@@ -90,7 +96,8 @@ fun ExploreScreen(
             // Segmented Switcher Bar (YouTube Music | Jamendo)
             Surface(
                 shape = RoundedCornerShape(50),
-                color = Color(0xFF1B1D1B),
+                color = Color.White.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -104,16 +111,16 @@ fun ExploreScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
-                            .background(if (currentTab == ExploreSourceTab.YOUTUBE) ElectricLime else Color.Transparent)
+                            .background(if (currentTab == ExploreSourceTab.YOUTUBE) Color(0xFFBAFF5C) else Color.Transparent)
                             .clickable { onTabSelected(ExploreSourceTab.YOUTUBE) }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "YouTube Music",
+                            text = stringResource(R.string.explore_youtube),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (currentTab == ExploreSourceTab.YOUTUBE) FontWeight.Bold else FontWeight.Medium,
-                            color = if (currentTab == ExploreSourceTab.YOUTUBE) OnElectricLime else Color(0xFFCCCCCC)
+                            color = if (currentTab == ExploreSourceTab.YOUTUBE) Color.Black else Color.White.copy(alpha = 0.7f)
                         )
                     }
 
@@ -122,16 +129,16 @@ fun ExploreScreen(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
-                            .background(if (currentTab == ExploreSourceTab.JAMENDO) ElectricLime else Color.Transparent)
+                            .background(if (currentTab == ExploreSourceTab.JAMENDO) Color(0xFFBAFF5C) else Color.Transparent)
                             .clickable { onTabSelected(ExploreSourceTab.JAMENDO) }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Jamendo",
+                            text = stringResource(R.string.explore_jamendo),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (currentTab == ExploreSourceTab.JAMENDO) FontWeight.Bold else FontWeight.Medium,
-                            color = if (currentTab == ExploreSourceTab.JAMENDO) OnElectricLime else Color(0xFFCCCCCC)
+                            color = if (currentTab == ExploreSourceTab.JAMENDO) Color.Black else Color.White.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -152,11 +159,14 @@ fun ExploreScreen(
                             currentPlayingTitle = currentPlayingTitle,
                             isPlaying = isPlaying,
                             isOnline = isOnline,
+                            favoriteSongIds = favoriteSongIds,
                             contentPadding = contentPadding,
                             onSearch = onYouTubeSearch,
                             onPlay = onYouTubePlay,
                             onAddToQueue = onYouTubeAddToQueue,
-                            onAddToPlaylist = onYouTubeAddToPlaylist
+                            onAddToPlaylist = onYouTubeAddToPlaylist,
+                            onToggleFavorite = onYouTubeToggleFavorite,
+                            onDownload = onYouTubeDownload
                         )
                     }
 

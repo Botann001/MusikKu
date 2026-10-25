@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +59,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import com.example.musikku.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +71,7 @@ import com.example.musikku.data.remote.dto.JamendoTrackDto
 import com.example.musikku.ui.common.AlbumArtPlaceholder
 import com.example.musikku.ui.library.JamendoSearchState
 import com.example.musikku.ui.theme.ElectricLime
+import com.example.musikku.ui.theme.MintGreen
 import com.example.musikku.ui.theme.JetCard
 import com.example.musikku.ui.theme.OnElectricLime
 import com.example.musikku.ui.theme.TextMuted
@@ -138,7 +142,7 @@ fun JamendoContent(
                 TextField(
                     value = searchInput,
                     onValueChange = { searchInput = it },
-                    placeholder = { Text("Cari jutaan lagu gratis", color = Color(0xFF7E807E)) },
+                    placeholder = { Text(stringResource(R.string.explore_search_hint), color = Color(0xFF7E807E)) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
@@ -164,8 +168,8 @@ fun JamendoContent(
                     singleLine = true,
                     shape = RoundedCornerShape(50),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = JetCard,
-                        unfocusedContainerColor = JetCard,
+                        focusedContainerColor = Color.White.copy(alpha = 0.08f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         focusedTextColor = Color.White,
@@ -176,7 +180,9 @@ fun JamendoContent(
                         focusManager.clearFocus()
                         onSearch(searchInput)
                     }),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(50))
                 )
             }
         }
@@ -197,7 +203,8 @@ fun JamendoContent(
 
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (isSelected) ElectricLime else Color(0xFF1D1F1D),
+                        color = if (isSelected) Color(0xFFBAFF5C) else Color.White.copy(alpha = 0.08f),
+                        border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                         modifier = Modifier.clickable {
                             selectedGenre = genre
                             if (genre == "Populer") {
@@ -213,7 +220,7 @@ fun JamendoContent(
                             text = genre,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) OnElectricLime else Color(0xFFE0E0E0),
+                            color = if (isSelected) Color.Black else Color.White,
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
                         )
                     }
@@ -225,9 +232,9 @@ fun JamendoContent(
         item(key = "jamendo_wifi_card") {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = JetCard),
-                    border = BorderStroke(1.dp, Color(0xFF262826)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.07f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -235,7 +242,7 @@ fun JamendoContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                            .padding(horizontal = 18.dp, vertical = 14.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -256,10 +263,10 @@ fun JamendoContent(
                             checked = downloadOnlyWifi,
                             onCheckedChange = onToggleDownloadOnlyWifi,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = OnElectricLime,
-                                checkedTrackColor = ElectricLime,
-                                uncheckedThumbColor = Color(0xFF888888),
-                                uncheckedTrackColor = Color(0xFF2E302E)
+                                checkedThumbColor = Color(0xFF163224),
+                                checkedTrackColor = Color(0xFFBAFF5C),
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color.White.copy(alpha = 0.20f)
                             )
                         )
                     }
@@ -411,9 +418,14 @@ private fun JamendoTrackCard(
     val rowAlpha = if (isPlayable) 1f else 0.45f
 
     Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = JetCard),
-        border = BorderStroke(1.dp, Color(0xFF222422)),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPlaying) Color(0x381C4830) else Color.White.copy(alpha = 0.07f)
+        ),
+        border = BorderStroke(
+            if (isPlaying) 1.5.dp else 1.dp,
+            if (isPlaying) MintGreen.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.12f)
+        ),
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
@@ -424,7 +436,7 @@ private fun JamendoTrackCard(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             // Thumbnail dengan Cover Album atau Gradien Artistik
             Box(
@@ -432,7 +444,7 @@ private fun JamendoTrackCard(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF222422))
+                    .background(Color.White.copy(alpha = 0.10f))
             ) {
                 val artUrl = track.albumImage ?: track.image
                 if (!artUrl.isNullOrBlank()) {
@@ -459,7 +471,7 @@ private fun JamendoTrackCard(
                     text = track.name,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = if (isPlaying) ElectricLime else Color.White,
+                    color = if (isPlaying) MintGreen else Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -483,7 +495,7 @@ private fun JamendoTrackCard(
                         val progressFloat = (downloadPercent ?: 0) / 100f
                         CircularProgressIndicator(
                             progress = { progressFloat.coerceIn(0f, 1f) },
-                            color = ElectricLime,
+                            color = MintGreen,
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp
                         )
@@ -492,7 +504,7 @@ private fun JamendoTrackCard(
                                 text = "$downloadPercent%",
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = ElectricLime
+                                color = MintGreen
                             )
                         }
                     }
@@ -502,14 +514,15 @@ private fun JamendoTrackCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF222522),
+                            color = Color(0x381C4830),
+                            border = BorderStroke(1.dp, MintGreen.copy(alpha = 0.5f)),
                             modifier = Modifier.size(42.dp)
                         ) {
                             IconButton(onClick = onDeleteClick, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = "Sudah diunduh",
-                                    tint = ElectricLime,
+                                    tint = MintGreen,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -520,7 +533,8 @@ private fun JamendoTrackCard(
                 else -> {
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF222422),
+                        color = Color.White.copy(alpha = 0.10f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                         modifier = Modifier.size(42.dp)
                     ) {
                         IconButton(

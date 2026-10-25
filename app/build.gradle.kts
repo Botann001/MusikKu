@@ -52,6 +52,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -62,6 +63,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -86,6 +88,7 @@ dependencies {
 
     // Coil (Image Loading)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.palette)
 
     // Retrofit (Network & Jamendo API)
     implementation(libs.retrofit)
@@ -96,6 +99,9 @@ dependencies {
 
     // DataStore Preferences (Pengaturan Unduhan)
     implementation(libs.androidx.datastore.preferences)
+
+    // NewPipeExtractor (Ekstraktor YouTube langsung di perangkat HP)
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
