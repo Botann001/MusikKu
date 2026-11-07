@@ -1,0 +1,57 @@
+{
+  "name": "musikku-desktop",
+  "version": "1.0.0",
+  "description": "MusikKu Desktop — Modern music player with light sky blue & frosted glassmorphism UI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable",
+    "pack": "electron-builder --dir"
+  },
+  "author": "Botann001",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "music-metadata": "^10.6.3"
+  },
+  "build": {
+    "appId": "com.botann001.musikku",
+    "productName": "MusikKu",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true
+    },
+    "portable": {
+      "artifactName": "MusikKu-Desktop-${version}-portable.exe"
+    }
+  }
+}
