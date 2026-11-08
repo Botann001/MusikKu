@@ -9,28 +9,62 @@ let mainWindow;
 
 // ─── Resolve yt-dlp & Python PATH on Windows ────────────────────────────────
 const localAppData = process.env.LOCALAPPDATA || '';
-const extraBinDirs = [
+const exeName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+
+const searchDirs = [
+  // 1. Packaged Electron app (unpacked ASAR resources)
+  process.resourcesPath ? path.join(process.resourcesPath, 'app.asar.unpacked', 'bin') : null,
+  process.resourcesPath ? path.join(process.resourcesPath, 'bin') : null,
+  path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), 'bin'),
+  // 2. Development or relative bin folders
+  path.join(__dirname, 'bin'),
+  path.join(__dirname, '..', 'bin'),
+  path.join(process.cwd(), 'bin'),
+  path.join(process.cwd(), 'desktop', 'bin'),
+  // 3. User Python Scripts paths
   path.join(localAppData, 'Programs', 'Python', 'Python314', 'Scripts'),
   path.join(localAppData, 'Programs', 'Python', 'Python314'),
   path.join(localAppData, 'Programs', 'Python', 'Python313', 'Scripts'),
   path.join(localAppData, 'Programs', 'Python', 'Python313'),
   path.join(localAppData, 'Programs', 'Python', 'Python312', 'Scripts'),
   path.join(localAppData, 'Programs', 'Python', 'Python312'),
-  path.join(process.env.APPDATA || '', 'Python', 'Scripts'),
-  path.join(__dirname, 'bin')
-];
-for (const dir of extraBinDirs) {
+  path.join(process.env.APPDATA || '', 'Python', 'Scripts')
+].filter(Boolean);
+
+for (const dir of searchDirs) {
   if (fs.existsSync(dir) && !(process.env.PATH || '').includes(dir)) {
     process.env.PATH = `${dir};${process.env.PATH || ''}`;
   }
 }
 
 function getYtDlpCommand() {
-  for (const dir of extraBinDirs) {
-    const candidate = path.join(dir, 'yt-dlp.exe');
+  for (const dir of searchDirs) {
+    const candidate = path.join(dir, exeName);
     if (fs.existsSync(candidate)) return candidate;
   }
   return 'yt-dlp';
+}
+
+function resolveDirectAudioUrl(url) {
+  return new Promise((resolve) => {
+    const ytdlpBin = getYtDlpCommand();
+    const args = [
+      '--extractor-args', 'youtube:player_client=web,mweb,android',
+      '-f', 'ba/b',
+      '-g',
+      url
+    ];
+    execFile(ytdlpBin, args, { timeout: 10000 }, (err, stdout) => {
+      if (err || !stdout) {
+        return resolve(null);
+      }
+      const lines = stdout.trim().split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
+      if (lines.length > 0) {
+        return resolve(lines[0]);
+      }
+      resolve(null);
+    });
+  });
 }
 
 // ─── Local Audio Streaming Proxy Server ─────────────────────────────────────
@@ -129,7 +163,7 @@ function startStreamServer() {
           if (isEnded) return;
           const ytdlpBin = getYtDlpCommand();
           const args = [
-            '--extractor-args', 'youtube:player_client=android,web',
+            '--extractor-args', 'youtube:player_client=web,mweb,android',
             '-f', 'ba/b',
             '-o', '-',
             target
@@ -148,18 +182,18 @@ function startStreamServer() {
             const q = fallbackQuery || (target.startsWith('http') ? 'Trending Musik Indonesia' : target);
             fallbackStarted = true;
             try { child?.kill(); } catch (e) {}
-            console.log(`[StreamServer] YouTube blocked/failed. Auto-fallback to: scsearch1:${q}`);
+            console.log(`[StreamServer] YouTube failed. Auto-fallback to: scsearch1:${q}`);
             run(`scsearch1:${q}`, true);
             return true;
           }
 
-          // Safety timeout: if YouTube stalls or hangs without sending data, auto fallback after 8 seconds
+          // Safety timeout: if YouTube stalls or hangs without sending data, auto fallback after 12 seconds
           const fallbackTimeout = setTimeout(() => {
             if (!dataSent && !isEnded && !isFallback) {
-              console.log('[StreamServer] Handshake timeout (8s), auto switching to fallback stream...');
+              console.log('[StreamServer] Handshake timeout (12s), auto switching to fallback stream...');
               if (!tryFallback()) streamViaHttpProxy();
             }
-          }, 8000);
+          }, 12000);
 
           child.stdout.on('data', (chunk) => {
             if (isEnded) return;
@@ -178,23 +212,21 @@ function startStreamServer() {
           });
 
           child.stderr.on('data', (d) => {
-            const s = d.toString();
-            if (s.includes('Sign in to confirm') || s.includes('bot') || s.includes('unavailable') || s.includes('403') || s.includes('ERROR:') || s.includes('Forbidden')) {
-              if (!tryFallback()) streamViaHttpProxy();
-            }
+            // Keep child alive; yt-dlp emits many non-fatal warnings
+            console.log('[StreamServer yt-dlp stderr]', d.toString().trim());
           });
 
           child.on('error', (err) => {
             clearTimeout(fallbackTimeout);
             console.warn('[StreamServer] Child process error:', err.message);
-            // yt-dlp tidak terpasang atau gagal spawn, langsung alihkan ke Invidious HTTP proxy!
-            streamViaHttpProxy();
+            if (!tryFallback()) streamViaHttpProxy();
           });
 
           child.on('close', (code) => {
             clearTimeout(fallbackTimeout);
             if (fallbackStarted && !isFallback) return;
             if (!dataSent) {
+              console.warn(`[StreamServer] yt-dlp exited with code ${code} without sending data`);
               if (!tryFallback()) streamViaHttpProxy();
             } else {
               endResponse();
@@ -581,7 +613,7 @@ function searchYouTube(query, page = 1) {
 
     try {
       execFile(ytdlpBin, [
-        '--extractor-args', 'youtube:player_client=android,web',
+        '--extractor-args', 'youtube:player_client=web,mweb,android',
         '-j', '--flat-playlist',
         '--playlist-items', `${startIdx}:${endIdx}`,
         `ytsearch${endIdx}:${targetQuery}`
@@ -785,10 +817,28 @@ ipcMain.handle('resolve-stream-url', async (_event, targetOrSong) => {
   if (targetIdOrUrl.includes('jamendo.com') || (targetIdOrUrl.startsWith('http') && targetIdOrUrl.endsWith('.mp3'))) {
     return targetIdOrUrl;
   }
+  // Jika sudah URL streaming googlevideo langsung
+  if (targetIdOrUrl.includes('googlevideo.com') || targetIdOrUrl.includes('sndcdn.com')) {
+    return targetIdOrUrl;
+  }
   const url = targetIdOrUrl.startsWith('http') ? targetIdOrUrl : `https://www.youtube.com/watch?v=${targetIdOrUrl}`;
   let vId = '';
   const match = url.match(/(?:youtu\.be\/|v\/|watch\?v=|\&v=)([^#\&\?]{11})/i);
   if (match) vId = match[1];
+
+  // 1. Prioritas: Coba dapatkan direct CDN URL (googlevideo / sndcdn) via yt-dlp -g
+  // Direct CDN URL langsung di-stream oleh HTML5 audio tanpa beban proxy lokal (bisa scrubbing & fast buffer)
+  try {
+    const directUrl = await resolveDirectAudioUrl(url);
+    if (directUrl && directUrl.startsWith('http')) {
+      console.log('[resolve-stream-url] Direct CDN stream URL berhasil didapatkan');
+      return directUrl;
+    }
+  } catch (err) {
+    console.warn('[resolve-stream-url] Direct resolution gagal, fallback ke proxy lokal:', err.message);
+  }
+
+  // 2. Fallback: Proxy streaming lokal
   return `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(url)}&q=${encodeURIComponent(fallbackQuery)}${vId ? `&id=${vId}` : ''}`;
 });
 
@@ -949,7 +999,7 @@ ipcMain.handle('online-download', async (_event, track) => {
               source
             ]
           : [
-              '--extractor-args', 'youtube:player_client=android,web',
+              '--extractor-args', 'youtube:player_client=web,mweb,android',
               '-f', 'ba[ext=m4a]/ba/b',
               '-o', targetPath,
               source

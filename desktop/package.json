@@ -24,11 +24,15 @@
     "directories": {
       "output": "dist"
     },
+    "asarUnpack": [
+      "bin/**/*"
+    ],
     "files": [
       "main.js",
       "preload.js",
       "renderer/**/*",
       "assets/**/*",
+      "bin/**/*",
       "node_modules/**/*"
     ],
     "win": {
