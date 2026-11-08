@@ -65,6 +65,66 @@ function startStreamServer() {
           try { res.end(); } catch (e) {}
         }
 
+        async function streamViaHttpProxy() {
+          if (isEnded) return;
+          let vId = parsedUrl.searchParams.get('id');
+          if (!vId && audioUrl) {
+            const match = audioUrl.match(/(?:youtu\.be\/|v\/|watch\?v=|\&v=)([^#\&\?]{11})/i);
+            if (match) vId = match[1];
+          }
+
+          if (vId) {
+            console.log(`[StreamServer] Mencoba stream direct via Invidious Web API untuk video: ${vId}`);
+            const directUrl = await resolveInvidiousAudioUrl(vId);
+            if (directUrl && !isEnded) {
+              try {
+                const u = new URL(directUrl);
+                const client = u.protocol === 'http:' ? http : https;
+                const proxyReq = client.get(directUrl, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': '*/*'
+                  }
+                }, (proxyRes) => {
+                  if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
+                    const redUrl = new URL(proxyRes.headers.location, directUrl).href;
+                    const redU = new URL(redUrl);
+                    const redClient = redU.protocol === 'http:' ? http : https;
+                    redClient.get(redUrl, (rRes) => {
+                      if (!headersSent && !isEnded) {
+                        res.writeHead(200, {
+                          'Content-Type': rRes.headers['content-type'] || 'audio/mp4',
+                          'Accept-Ranges': 'bytes',
+                          'Access-Control-Allow-Origin': '*'
+                        });
+                        headersSent = true;
+                      }
+                      rRes.pipe(res);
+                    }).on('error', () => endResponse(500));
+                    return;
+                  }
+                  if (!headersSent && !isEnded) {
+                    res.writeHead(200, {
+                      'Content-Type': proxyRes.headers['content-type'] || 'audio/mp4',
+                      'Accept-Ranges': 'bytes',
+                      'Access-Control-Allow-Origin': '*'
+                    });
+                    headersSent = true;
+                  }
+                  proxyRes.pipe(res);
+                });
+                proxyReq.on('error', () => endResponse(500));
+                return true;
+              } catch (_) {
+                endResponse(500);
+                return false;
+              }
+            }
+          }
+          endResponse(500);
+          return false;
+        }
+
         function run(target, isFallback) {
           if (isEnded) return;
           const ytdlpBin = getYtDlpCommand();
@@ -75,14 +135,19 @@ function startStreamServer() {
             target
           ];
 
-          const child = spawn(ytdlpBin, args);
-          activeChild = child;
+          let child = null;
+          try {
+            child = spawn(ytdlpBin, args);
+            activeChild = child;
+          } catch (_) {
+            return streamViaHttpProxy();
+          }
 
           function tryFallback() {
             if (fallbackStarted || dataSent || isFallback || isEnded) return false;
             const q = fallbackQuery || (target.startsWith('http') ? 'Trending Musik Indonesia' : target);
             fallbackStarted = true;
-            try { child.kill(); } catch (e) {}
+            try { child?.kill(); } catch (e) {}
             console.log(`[StreamServer] YouTube blocked/failed. Auto-fallback to: scsearch1:${q}`);
             run(`scsearch1:${q}`, true);
             return true;
@@ -92,7 +157,7 @@ function startStreamServer() {
           const fallbackTimeout = setTimeout(() => {
             if (!dataSent && !isEnded && !isFallback) {
               console.log('[StreamServer] Handshake timeout (8s), auto switching to fallback stream...');
-              tryFallback();
+              if (!tryFallback()) streamViaHttpProxy();
             }
           }, 8000);
 
@@ -115,22 +180,22 @@ function startStreamServer() {
           child.stderr.on('data', (d) => {
             const s = d.toString();
             if (s.includes('Sign in to confirm') || s.includes('bot') || s.includes('unavailable') || s.includes('403') || s.includes('ERROR:') || s.includes('Forbidden')) {
-              tryFallback();
+              if (!tryFallback()) streamViaHttpProxy();
             }
           });
 
           child.on('error', (err) => {
             clearTimeout(fallbackTimeout);
             console.warn('[StreamServer] Child process error:', err.message);
-            if (fallbackStarted && !isFallback) return;
-            if (!tryFallback()) endResponse(500);
+            // yt-dlp tidak terpasang atau gagal spawn, langsung alihkan ke Invidious HTTP proxy!
+            streamViaHttpProxy();
           });
 
           child.on('close', (code) => {
             clearTimeout(fallbackTimeout);
             if (fallbackStarted && !isFallback) return;
             if (!dataSent) {
-              if (!tryFallback()) endResponse(500);
+              if (!tryFallback()) streamViaHttpProxy();
             } else {
               endResponse();
             }
@@ -324,32 +389,122 @@ ipcMain.handle('get-default-music-path', () => {
 // ─── Online Streaming & Downloader Tools ─────────────────────────────────────
 const JAMENDO_CLIENT_ID = 'dde1e7c5';
 
-function fetchJson(url) {
+function fetchJson(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const options = {
-      hostname: parsed.hostname,
-      path: parsed.pathname + parsed.search,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MusikKu-Desktop/1.0.0',
-        'Accept': 'application/json'
-      },
-      timeout: 8000
-    };
-    const req = https.get(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(e);
+    if (redirectCount > 4) return reject(new Error('Too many redirects'));
+    try {
+      const parsed = new URL(url);
+      const client = parsed.protocol === 'http:' ? http : https;
+      const options = {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'http:' ? 80 : 443),
+        path: parsed.pathname + parsed.search,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MusikKu-Desktop/1.0.0',
+          'Accept': 'application/json'
+        },
+        timeout: 8000
+      };
+      const req = client.get(options, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const nextUrl = new URL(res.headers.location, url).href;
+          return fetchJson(nextUrl, redirectCount + 1).then(resolve).catch(reject);
         }
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
       });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    } catch (err) {
+      reject(err);
+    }
   });
+}
+
+// ─── Invidious / Piped Public Instances (Sama seperti Android InvidiousInstanceManager.kt) ────
+const INVIDIOUS_INSTANCES = [
+  'https://invidious.nerdvpn.de',
+  'https://inv.nadeko.net',
+  'https://invidious.f5.si',
+  'https://invidious.privacyredirect.com',
+  'https://iv.datura.network',
+  'https://invidious.materialio.us',
+  'https://invidious.perennialte.ch'
+];
+
+async function searchYouTubeViaHttp(query, page = 1) {
+  const q = (query || '').trim();
+  const targetQuery = (!q || q === 'popular' || q === 'trending') ? 'Trending Musik Indonesia' : q;
+  const p = Math.max(1, parseInt(page, 10) || 1);
+
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(targetQuery)}&type=video&page=${p}`;
+      const items = await fetchJson(url);
+      if (Array.isArray(items) && items.length > 0) {
+        const tracks = [];
+        const seen = new Set();
+        for (const item of items) {
+          const vId = item.videoId || item.id;
+          if (!vId || item.type === 'channel' || item.type === 'playlist') continue;
+          const duration = Math.round(item.lengthSeconds || item.duration || 0);
+          if (duration <= 45 || duration > 900) continue;
+          if (seen.has(vId)) continue;
+          seen.add(vId);
+
+          const ytUrl = `https://www.youtube.com/watch?v=${vId}`;
+          const fallbackQ = `${item.title || ''} ${item.author || item.uploader || ''}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
+          const cover = item.videoThumbnails?.find(t => t.quality === 'high' || t.quality === 'medium')?.url 
+            || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`;
+
+          tracks.push({
+            id: 'yt_' + vId,
+            youtubeId: vId,
+            title: item.title,
+            artist: item.author || item.uploader || 'Artis',
+            album: 'YouTube Music',
+            duration: duration,
+            cover: cover,
+            streamUrl: `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(ytUrl)}&q=${encodeURIComponent(fallbackQ)}&id=${vId}`,
+            sourceUrl: ytUrl,
+            downloadUrl: ytUrl,
+            isOnline: true,
+            isFullTrack: true,
+            source: 'YouTube Music'
+          });
+        }
+        if (tracks.length > 0) return tracks;
+      }
+    } catch (_) {}
+  }
+  return [];
+}
+
+async function resolveInvidiousAudioUrl(videoId) {
+  if (!videoId) return null;
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/videos/${videoId}`;
+      const data = await fetchJson(url);
+      if (data) {
+        const adaptive = data.adaptiveFormats || [];
+        const audioFormat = adaptive.find(f => (f.type || '').includes('audio/mp4') || (f.type || '').includes('audio/webm'))
+          || adaptive.find(f => (f.type || '').includes('audio'))
+          || (data.formatStreams || [])[0];
+        if (audioFormat && audioFormat.url) {
+          return audioFormat.url;
+        }
+      }
+    } catch (_) {}
+  }
+  return null;
 }
 
 // Helper: Search SoundCloud for full commercial & indie music (No bot blocks)
@@ -413,7 +568,7 @@ function searchSoundCloud(query, page = 1) {
   });
 }
 
-// Helper: Search YouTube for full-length songs (uses Android client to bypass bot check)
+// Helper: Search YouTube for full-length songs (uses Android client to bypass bot check + Invidious Web fallback)
 function searchYouTube(query, page = 1) {
   return new Promise((resolve) => {
     const ytdlpBin = getYtDlpCommand();
@@ -424,53 +579,63 @@ function searchYouTube(query, page = 1) {
     const endIdx = p * pageSize;
     const startIdx = endIdx - pageSize + 1;
 
-    execFile(ytdlpBin, [
-      '--extractor-args', 'youtube:player_client=android,web',
-      '-j', '--flat-playlist',
-      '--playlist-items', `${startIdx}:${endIdx}`,
-      `ytsearch${endIdx}:${targetQuery}`
-    ], { maxBuffer: 15 * 1024 * 1024 }, (err, stdout) => {
-      if (err) {
-        console.warn('YouTube search error:', err.message);
-        return resolve([]);
-      }
-      try {
-        const lines = stdout.trim().split('\n').filter(Boolean);
-        const tracks = [];
-        const seen = new Set();
-        for (const line of lines) {
-          try {
-            const item = JSON.parse(line);
-            const rawDuration = Math.round(item.duration || 0);
-            // Hanya lagu utuh (45s s.d. 15 menit), abaikan mixtape kompilasi 1-2 jam
-            if (rawDuration <= 45 || rawDuration > 900) continue;
-            if (seen.has(item.id)) continue;
-            seen.add(item.id);
-
-            const ytUrl = `https://www.youtube.com/watch?v=${item.id}`;
-            const fallbackQ = `${item.title || ''} ${item.uploader || item.channel || ''}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
-            tracks.push({
-              id: 'yt_' + item.id,
-              youtubeId: item.id,
-              title: item.title,
-              artist: item.uploader || item.channel || 'Artis',
-              album: 'YouTube Music',
-              duration: rawDuration,
-              cover: item.thumbnails?.[item.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-              streamUrl: `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(ytUrl)}&q=${encodeURIComponent(fallbackQ)}`,
-              sourceUrl: ytUrl,
-              downloadUrl: ytUrl,
-              isOnline: true,
-              isFullTrack: true,
-              source: 'YouTube Music'
-            });
-          } catch (_) {}
+    try {
+      execFile(ytdlpBin, [
+        '--extractor-args', 'youtube:player_client=android,web',
+        '-j', '--flat-playlist',
+        '--playlist-items', `${startIdx}:${endIdx}`,
+        `ytsearch${endIdx}:${targetQuery}`
+      ], { maxBuffer: 15 * 1024 * 1024 }, async (err, stdout) => {
+        if (err || !stdout || stdout.trim().length === 0) {
+          console.log('[YouTubeSearch] yt-dlp tidak tersedia/gagal. Beralih ke Invidious Web API...');
+          const httpResults = await searchYouTubeViaHttp(query, page);
+          return resolve(httpResults);
         }
-        resolve(tracks);
-      } catch (e) {
-        resolve([]);
-      }
-    });
+        try {
+          const lines = stdout.trim().split('\n').filter(Boolean);
+          const tracks = [];
+          const seen = new Set();
+          for (const line of lines) {
+            try {
+              const item = JSON.parse(line);
+              const rawDuration = Math.round(item.duration || 0);
+              // Hanya lagu utuh (45s s.d. 15 menit), abaikan mixtape kompilasi 1-2 jam
+              if (rawDuration <= 45 || rawDuration > 900) continue;
+              if (seen.has(item.id)) continue;
+              seen.add(item.id);
+
+              const ytUrl = `https://www.youtube.com/watch?v=${item.id}`;
+              const fallbackQ = `${item.title || ''} ${item.uploader || item.channel || ''}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
+              tracks.push({
+                id: 'yt_' + item.id,
+                youtubeId: item.id,
+                title: item.title,
+                artist: item.uploader || item.channel || 'Artis',
+                album: 'YouTube Music',
+                duration: rawDuration,
+                cover: item.thumbnails?.[item.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+                streamUrl: `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(ytUrl)}&q=${encodeURIComponent(fallbackQ)}&id=${item.id}`,
+                sourceUrl: ytUrl,
+                downloadUrl: ytUrl,
+                isOnline: true,
+                isFullTrack: true,
+                source: 'YouTube Music'
+              });
+            } catch (_) {}
+          }
+          if (tracks.length === 0) {
+            const httpResults = await searchYouTubeViaHttp(query, page);
+            return resolve(httpResults);
+          }
+          resolve(tracks);
+        } catch (e) {
+          const httpResults = await searchYouTubeViaHttp(query, page);
+          resolve(httpResults);
+        }
+      });
+    } catch (_) {
+      searchYouTubeViaHttp(query, page).then(resolve);
+    }
   });
 }
 
@@ -621,7 +786,10 @@ ipcMain.handle('resolve-stream-url', async (_event, targetOrSong) => {
     return targetIdOrUrl;
   }
   const url = targetIdOrUrl.startsWith('http') ? targetIdOrUrl : `https://www.youtube.com/watch?v=${targetIdOrUrl}`;
-  return `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(url)}&q=${encodeURIComponent(fallbackQuery)}`;
+  let vId = '';
+  const match = url.match(/(?:youtu\.be\/|v\/|watch\?v=|\&v=)([^#\&\?]{11})/i);
+  if (match) vId = match[1];
+  return `http://127.0.0.1:${streamServerPort}/stream?url=${encodeURIComponent(url)}&q=${encodeURIComponent(fallbackQuery)}${vId ? `&id=${vId}` : ''}`;
 });
 
 // 2b. Lyrics Retrieval via LRCLIB (Exact match + fuzzy fallback + title sanitizer)
