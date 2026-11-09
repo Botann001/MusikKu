@@ -39,6 +39,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -280,9 +283,15 @@ fun LibraryScreen(
 
     val focusManager = LocalFocusManager.current
 
-    // Pastikan keyboard tidak terbuka otomatis saat aplikasi pertama kali dibuka
     androidx.compose.runtime.LaunchedEffect(Unit) {
         focusManager.clearFocus()
+    }
+    val rootFocusRequester = remember { FocusRequester() }
+
+    // Pastikan keyboard dan kursor tidak aktif otomatis saat aplikasi pertama kali dibuka
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        rootFocusRequester.requestFocus()
+        focusManager.clearFocus(force = true)
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -296,6 +305,8 @@ fun LibraryScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusRequester(rootFocusRequester)
+            .focusable()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -830,6 +841,10 @@ private fun SearchBar(
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        focusManager.clearFocus()
+    }
 
     Box(
         modifier = modifier
