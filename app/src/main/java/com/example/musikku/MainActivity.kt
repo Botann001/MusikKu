@@ -67,9 +67,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
-            window.isStatusBarContrastEnforced = false
         }
 
         // Proteksi Anti-Spyware: Cegah serangan Tapjacking melalui overlay berbahaya
@@ -109,8 +110,9 @@ class MainActivity : ComponentActivity() {
                 )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     window.isNavigationBarContrastEnforced = false
-                    window.isStatusBarContrastEnforced = false
                 }
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
                 val insetsController = WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = !darkTheme
                 insetsController.isAppearanceLightNavigationBars = !darkTheme
