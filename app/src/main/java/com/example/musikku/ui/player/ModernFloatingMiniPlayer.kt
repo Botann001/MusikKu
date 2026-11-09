@@ -121,8 +121,8 @@ fun ModernFloatingMiniPlayer(
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color(0x59163224), // Frosted transparent emerald glass
-                        Color(0x500E2218)
+                        Color(0xD9163224), // Frosted emerald glass
+                        Color(0xCC0E2218)
                     )
                 )
             )

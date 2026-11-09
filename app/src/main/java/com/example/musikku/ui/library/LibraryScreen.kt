@@ -1662,9 +1662,9 @@ private fun ModernBottomNavigationBar(
     ) {
         Surface(
             shape = RoundedCornerShape(32.dp),
-            color = Color(0x40102218), // ~25% opacity — Frosted transparent emerald glass
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-            shadowElevation = 0.dp,
+            color = Color(0xD9102218), // Frosted dark emerald glass
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+            shadowElevation = 16.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
