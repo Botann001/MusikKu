@@ -700,9 +700,8 @@ private fun LibraryTopBar(
     onRefreshClick: () -> Unit
 ) {
     Surface(
-        color = Color(0xF508140E),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-        shadowElevation = 8.dp,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
