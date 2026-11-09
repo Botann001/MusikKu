@@ -88,7 +88,8 @@ class LibraryViewModel(
         val isOnline: Boolean,
         val downloadOnlyWifi: Boolean,
         val themeMode: ThemeMode,
-        val appLanguage: AppLanguage
+        val appLanguage: AppLanguage,
+        val recentSearches: List<String>
     )
 
     private val tabQueryFlow = combine(
@@ -102,9 +103,10 @@ class LibraryViewModel(
             networkMonitor.isOnline,
             settingsRepository.downloadOnlyWifi,
             settingsRepository.themeMode,
-            settingsRepository.appLanguage
-        ) { online, wifiOnly, theme, lang ->
-            listOf(online, wifiOnly, theme, lang)
+            settingsRepository.appLanguage,
+            settingsRepository.recentSearches
+        ) { online, wifiOnly, theme, lang, recents ->
+            listOf(online, wifiOnly, theme, lang, recents)
         }
     ) { list1, list2, list3 ->
         @Suppress("UNCHECKED_CAST")
@@ -119,7 +121,8 @@ class LibraryViewModel(
             isOnline = list3[0] as Boolean,
             downloadOnlyWifi = list3[1] as Boolean,
             themeMode = list3[2] as ThemeMode,
-            appLanguage = list3[3] as AppLanguage
+            appLanguage = list3[3] as AppLanguage,
+            recentSearches = list3[4] as List<String>
         )
     }
 
@@ -149,6 +152,7 @@ class LibraryViewModel(
             themeMode = tabState.themeMode,
             appLanguage = tabState.appLanguage,
             sortOrder = tabState.sortOrder,
+            recentSearches = tabState.recentSearches,
             isLoading = tabState.isLoading,
             isEmpty = !tabState.isLoading && when (tabState.tab) {
                 LibraryTab.SONGS -> sortedSongs.isEmpty()
@@ -295,6 +299,7 @@ class LibraryViewModel(
         }
 
         viewModelScope.launch {
+            settingsRepository.addRecentSearch(queryClean)
             _jamendoState.update { it.copy(query = queryClean, isSearching = true, errorMessage = null) }
             val result = jamendoRepository.searchTracks(queryClean)
             result.onSuccess { tracks ->
@@ -362,6 +367,7 @@ class LibraryViewModel(
         }
 
         viewModelScope.launch {
+            settingsRepository.addRecentSearch(queryClean)
             _youTubeState.update { it.copy(query = queryClean, isSearching = true, errorMessage = null) }
             val result = youTubeMusicRepository.searchMusic(queryClean)
             result.onSuccess { tracks ->
@@ -554,6 +560,18 @@ class LibraryViewModel(
     fun setAppLanguage(language: AppLanguage) {
         viewModelScope.launch {
             settingsRepository.setAppLanguage(language)
+        }
+    }
+
+    fun removeRecentSearch(query: String) {
+        viewModelScope.launch {
+            settingsRepository.removeRecentSearch(query)
+        }
+    }
+
+    fun clearRecentSearches() {
+        viewModelScope.launch {
+            settingsRepository.clearRecentSearches()
         }
     }
 

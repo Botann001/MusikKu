@@ -410,7 +410,10 @@ fun LibraryScreen(
                 onJamendoStream = viewModel::playJamendoTrack,
                 onJamendoDownload = viewModel::downloadJamendoTrack,
                 onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
-                onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi
+                onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi,
+                recentSearches = uiState.recentSearches,
+                onRemoveRecentSearch = viewModel::removeRecentSearch,
+                onClearRecentSearches = viewModel::clearRecentSearches
             )
         } else if (!hasPermission) {
             PermissionEmptyState(

@@ -62,7 +62,10 @@ fun ExploreScreen(
     onJamendoStream: (JamendoTrackDto) -> Unit,
     onJamendoDownload: (JamendoTrackDto) -> Unit,
     onJamendoDeleteDownload: (Long) -> Unit,
-    onToggleDownloadOnlyWifi: (Boolean) -> Unit
+    onToggleDownloadOnlyWifi: (Boolean) -> Unit,
+    recentSearches: List<String> = emptyList(),
+    onRemoveRecentSearch: (String) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -161,6 +164,9 @@ fun ExploreScreen(
                             isOnline = isOnline,
                             favoriteSongIds = favoriteSongIds,
                             contentPadding = contentPadding,
+                            recentSearches = recentSearches,
+                            onRemoveRecentSearch = onRemoveRecentSearch,
+                            onClearRecentSearches = onClearRecentSearches,
                             onSearch = onYouTubeSearch,
                             onPlay = onYouTubePlay,
                             onAddToQueue = onYouTubeAddToQueue,
@@ -178,6 +184,9 @@ fun ExploreScreen(
                             downloadOnlyWifi = downloadOnlyWifi,
                             contentPadding = contentPadding,
                             showHeader = false,
+                            recentSearches = recentSearches,
+                            onRemoveRecentSearch = onRemoveRecentSearch,
+                            onClearRecentSearches = onClearRecentSearches,
                             onSearch = onJamendoSearch,
                             onStream = onJamendoStream,
                             onDownload = onJamendoDownload,

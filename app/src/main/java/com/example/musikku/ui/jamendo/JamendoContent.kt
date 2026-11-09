@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -84,6 +85,9 @@ fun JamendoContent(
     downloadOnlyWifi: Boolean,
     contentPadding: PaddingValues,
     showHeader: Boolean = true,
+    recentSearches: List<String> = emptyList(),
+    onRemoveRecentSearch: (String) -> Unit = {},
+    onClearRecentSearches: () -> Unit = {},
     onSearch: (String) -> Unit,
     onStream: (JamendoTrackDto) -> Unit,
     onDownload: (JamendoTrackDto) -> Unit,
@@ -184,6 +188,103 @@ fun JamendoContent(
                         .fillMaxWidth()
                         .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(50))
                 )
+            }
+        }
+
+        // ─── 2b. Pencarian Terakhir (Recent Searches) ─────────────────────────────
+        if (recentSearches.isNotEmpty() && searchInput.isBlank()) {
+            item(key = "jamendo_recent_searches") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = Color(0xFFBAFF5C),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Pencarian Terakhir",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Text(
+                            text = "Hapus Semua",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFBAFF5C),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { onClearRecentSearches() }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        recentSearches.forEach { query ->
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color.White.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                modifier = Modifier.clickable {
+                                    searchInput = query
+                                    selectedGenre = ""
+                                    focusManager.clearFocus()
+                                    onSearch(query)
+                                }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = query,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { onRemoveRecentSearch(query) },
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Hapus $query",
+                                            tint = Color.White.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

@@ -64,6 +64,7 @@ data class LibraryUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
+    val recentSearches: List<String> = emptyList(),
     val isLoading: Boolean = true,
     val isEmpty: Boolean = false
 )

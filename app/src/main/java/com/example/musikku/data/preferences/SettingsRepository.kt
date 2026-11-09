@@ -41,6 +41,7 @@ class SettingsRepository(private val context: Context) {
         val KEY_DOWNLOAD_ONLY_WIFI = booleanPreferencesKey("download_only_wifi")
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
+        val KEY_RECENT_SEARCHES = stringPreferencesKey("recent_searches_ordered")
     }
 
     /**
@@ -88,6 +89,42 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAppLanguage(language: AppLanguage) {
         context.dataStore.edit { preferences ->
             preferences[KEY_APP_LANGUAGE] = language.name
+        }
+    }
+
+    /** Riwayat pencarian musik terbaru (kronologis, unik, maksimal 15). */
+    val recentSearches: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        val raw = preferences[KEY_RECENT_SEARCHES] ?: ""
+        if (raw.isBlank()) emptyList()
+        else raw.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    suspend fun addRecentSearch(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) return
+        context.dataStore.edit { preferences ->
+            val raw = preferences[KEY_RECENT_SEARCHES] ?: ""
+            val currentList = if (raw.isBlank()) mutableListOf() else raw.split("\n").map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
+            currentList.remove(q)
+            currentList.add(0, q)
+            val trimmed = currentList.take(15)
+            preferences[KEY_RECENT_SEARCHES] = trimmed.joinToString("\n")
+        }
+    }
+
+    suspend fun removeRecentSearch(query: String) {
+        val q = query.trim()
+        context.dataStore.edit { preferences ->
+            val raw = preferences[KEY_RECENT_SEARCHES] ?: ""
+            val currentList = if (raw.isBlank()) mutableListOf() else raw.split("\n").map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
+            currentList.remove(q)
+            preferences[KEY_RECENT_SEARCHES] = currentList.joinToString("\n")
+        }
+    }
+
+    suspend fun clearRecentSearches() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(KEY_RECENT_SEARCHES)
         }
     }
 }
