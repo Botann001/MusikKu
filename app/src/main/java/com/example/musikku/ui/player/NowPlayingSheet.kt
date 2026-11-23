@@ -305,17 +305,12 @@ fun NowPlayingSheet(
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.85f),
-                                    modifier = Modifier.size(88.dp)
-                                )
-                            }
+                            AlbumArtPlaceholder(
+                                seed = song.title,
+                                modifier = Modifier.fillMaxSize(),
+                                iconSize = 88.dp,
+                                showConcentricRings = true
+                            )
                         }
                     }
                 }

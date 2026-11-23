@@ -57,9 +57,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.example.musikku.data.local.entity.SongEntity
 import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.SongAlbumArt
 import com.example.musikku.ui.common.LiveEqualizerIndicator
+import com.example.musikku.ui.common.rememberSheetScrollBlocker
 import com.example.musikku.ui.theme.MintGreen
 import com.example.musikku.ui.theme.TextMuted
 
@@ -208,10 +211,12 @@ fun QueueSheet(
                 }
 
                 // ─── List Antrean ────────────────────────────────────────────────
+                val sheetScrollBlocker = rememberSheetScrollBlocker()
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .nestedScroll(sheetScrollBlocker),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // ─── Section 1: SEDANG DIPUTAR ───────────────────────────────
@@ -248,20 +253,12 @@ fun QueueSheet(
                                             .clip(RoundedCornerShape(14.dp))
                                             .background(Color(0xFF163224))
                                     ) {
-                                        if (currentSong.albumArtUri.isNotBlank()) {
-                                            AsyncImage(
-                                                model = currentSong.albumArtUri,
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.matchParentSize()
-                                            )
-                                        } else {
-                                            AlbumArtPlaceholder(
-                                                seed = currentSong.title,
-                                                modifier = Modifier.matchParentSize(),
-                                                iconSize = 24.dp
-                                            )
-                                        }
+                                        SongAlbumArt(
+                                            albumArtUri = currentSong.albumArtUri,
+                                            title = currentSong.title,
+                                            modifier = Modifier.matchParentSize(),
+                                            iconSize = 24.dp
+                                        )
                                     }
 
                                     Spacer(modifier = Modifier.width(14.dp))
@@ -446,20 +443,12 @@ private fun QueueSongItemCard(
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.White.copy(alpha = 0.10f))
             ) {
-                if (song.albumArtUri.isNotBlank()) {
-                    AsyncImage(
-                        model = song.albumArtUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize()
-                    )
-                } else {
-                    AlbumArtPlaceholder(
-                        seed = song.title,
-                        modifier = Modifier.matchParentSize(),
-                        iconSize = 22.dp
-                    )
-                }
+                SongAlbumArt(
+                    albumArtUri = song.albumArtUri,
+                    title = song.title,
+                    modifier = Modifier.matchParentSize(),
+                    iconSize = 22.dp
+                )
             }
 
             Spacer(modifier = Modifier.width(14.dp))

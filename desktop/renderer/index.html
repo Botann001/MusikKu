@@ -41,44 +41,49 @@
         </button>
       </div>
 
-      <div class="sidebar-section-title">RUANG MUSIKMU</div>
+      <div class="sidebar-section-title" data-i18n="nav_space">RUANG MUSIKMU</div>
 
       <button class="nav active" data-tab="library" aria-current="page" aria-label="Perpustakaan" title="Perpustakaan">
         <span class="material-icons-round">graphic_eq</span>
-        <span class="nav-text">Perpustakaan</span>
+        <span class="nav-text" data-i18n="nav_library">Perpustakaan</span>
       </button>
 
       <button class="nav" data-tab="online" aria-label="Jelajah online" title="Jelajah online">
         <span class="material-icons-round">explore</span>
-        <span class="nav-text">Jelajah online</span>
+        <span class="nav-text" data-i18n="nav_online">Jelajah online</span>
       </button>
 
       <button class="nav" data-tab="favorites" aria-label="Favorit" title="Favorit">
         <span class="material-icons-round">favorite_border</span>
-        <span class="nav-text">Favorit</span>
+        <span class="nav-text" data-i18n="nav_favorites">Favorit</span>
       </button>
 
       <button class="nav" data-tab="downloads" aria-label="Unduhan" title="Unduhan">
         <span class="material-icons-round">cloud_download</span>
-        <span class="nav-text">Unduhan</span>
+        <span class="nav-text" data-i18n="nav_downloads">Unduhan</span>
         <span id="rail-dl-badge" class="nav-badge">0</span>
       </button>
 
       <button class="nav" data-tab="playlists" aria-label="Playlist" title="Playlist">
         <span class="material-icons-round">queue_music</span>
-        <span class="nav-text">Playlist</span>
+        <span class="nav-text" data-i18n="nav_playlists">Playlist</span>
+      </button>
+
+      <button class="nav" data-tab="settings" aria-label="Pengaturan" title="Pengaturan">
+        <span class="material-icons-round">settings</span>
+        <span class="nav-text" data-i18n="nav_settings">Pengaturan</span>
       </button>
 
       <div class="sidebar-bottom">
         <button id="btn-add-folder" class="btn-sidebar-action" title="Tambah folder" aria-label="Tambah folder">
           <span class="material-icons-round">add_box</span>
-          <span>Tambah folder</span>
+          <span data-i18n="btn_add_folder">Tambah folder</span>
         </button>
         <button id="btn-open-dl-modal" class="btn-sidebar-link" title="Download dari URL" aria-label="Tools Download URL">
           <span class="material-icons-round">link</span>
-          <span>Download dari URL</span>
+          <span data-i18n="btn_dl_url">Download dari URL</span>
         </button>
-        <div class="sidebar-tagline">Musikmu. Ruangmu.</div>
+        <div class="sidebar-tagline" data-i18n="tagline">Musikmu. Ruangmu.</div>
       </div>
     </nav>
 
@@ -92,15 +97,15 @@
       <!-- ─── 1. Layar Perpustakaan ────────────────────────────────────── -->
       <section id="view-library" class="tab-view">
         <div class="view-header">
-          <p class="eyebrow"><span class="dot"></span>MUSIKKU · PERPUSTAKAAN</p>
+          <p class="eyebrow"><span class="dot"></span><span data-i18n="lib_eyebrow">MUSIKKU · PERPUSTAKAAN</span></p>
           <div class="search" id="lib-search-wrap">
             <span class="material-icons-round">search</span>
-            <input type="text" id="library-search" placeholder="Cari lagu, artis, album..." autocomplete="off" />
+            <input type="text" id="library-search" placeholder="Cari lagu, artis, album..." data-i18n-placeholder="lib_search_placeholder" autocomplete="off" />
             <!-- Recent Search Popover Library -->
             <div id="lib-recent-popover" class="search-recent-popover hidden">
               <div class="recent-header">
-                <span class="recent-title">Riwayat Pencarian</span>
-                <button type="button" id="btn-clear-recent-lib" class="btn-clear-recent">Hapus Semua</button>
+                <span class="recent-title" data-i18n="recent_searches">Riwayat Pencarian</span>
+                <button type="button" id="btn-clear-recent-lib" class="btn-clear-recent" data-i18n="clear_all">Hapus Semua</button>
               </div>
               <div id="recent-list-lib" class="recent-list">
                 <!-- Populated dynamically -->
@@ -133,9 +138,9 @@
           </div>
 
           <div class="now">
-            <p class="eyebrow">SEDANG DIPUTAR</p>
+            <p class="eyebrow" data-i18n="now_playing">SEDANG DIPUTAR</p>
             <h1 class="h-hero" id="hero-title">—</h1>
-            <p class="sub" id="hero-subtitle">Pilih lagu dari perpustakaan atau jelajah</p>
+            <p class="sub" id="hero-subtitle" data-i18n="hero_subtitle_default">Pilih lagu dari perpustakaan atau jelajah</p>
             <div class="time"><b id="hero-cur-time">0:00</b> / <span id="hero-dur-time">0:00</span></div>
 
             <div class="controls">
@@ -173,13 +178,13 @@
         <section class="koleksi-section">
           <div class="koleksi-bar">
             <div class="koleksi-title-wrap">
-              <h2 class="section-title">Koleksi</h2>
+              <h2 class="section-title" data-i18n="koleksi_title">Koleksi</h2>
               <span id="lib-count" class="badge-count">0 lagu</span>
             </div>
             <div class="koleksi-actions">
               <button id="lib-play-all" class="btn btn-primary" aria-label="Putar semua">
                 <span class="material-icons-round">play_arrow</span>
-                Putar semua
+                <span data-i18n="play_all">Putar semua</span>
               </button>
               <button id="lib-shuffle" class="btn btn-ghost btn-icon" title="Acak" aria-label="Acak Putar">
                 <span class="material-icons-round">shuffle</span>
@@ -205,16 +210,16 @@
             <button id="card-btn-add-folder" class="koleksi-card dashed-card">
               <span class="material-icons-round kc-icon">create_new_folder</span>
               <div class="kc-info">
-                <span class="kc-title">Tambah folder</span>
-                <span class="kc-sub">Pindai musik dari komputermu</span>
+                <span class="kc-title" data-i18n="btn_add_folder">Tambah folder</span>
+                <span class="kc-sub" data-i18n="card_scan_sub">Pindai musik dari komputermu</span>
               </div>
             </button>
 
             <button id="card-btn-url-dl" class="koleksi-card dashed-card">
               <span class="material-icons-round kc-icon">download</span>
               <div class="kc-info">
-                <span class="kc-title">Unduh dari URL</span>
-                <span class="kc-sub">Tempel tautan, simpan offline</span>
+                <span class="kc-title" data-i18n="btn_dl_url">Unduh dari URL</span>
+                <span class="kc-sub" data-i18n="card_url_sub">Tempel tautan, simpan offline</span>
               </div>
             </button>
           </div>
@@ -223,8 +228,8 @@
           <div id="library-track-container" class="track-list-wrap">
             <div id="library-empty" class="empty-state hidden">
               <div class="disc empty" style="width:100px; height:100px; margin: 0 auto 16px;"></div>
-              <h3>Belum ada musik di perpustakaan</h3>
-              <p>Klik "Tambah folder" untuk memindai musik lokal atau cari musik di tab Jelajah.</p>
+              <h3 data-i18n="empty_lib_title">Belum ada musik di perpustakaan</h3>
+              <p data-i18n="empty_lib_sub">Klik "Tambah folder" untuk memindai musik lokal atau cari musik di tab Jelajah.</p>
             </div>
             <div id="library-track-list" class="track-list"></div>
           </div>
@@ -235,17 +240,17 @@
       <section id="view-online" class="tab-view hidden">
         <div class="view-header">
           <div>
-            <p id="online-eyebrow" class="eyebrow"><span class="dot"></span>STREAMING JUTAAN MUSIK ONLINE</p>
-            <h1 class="h-screen">Jelajah</h1>
+            <p id="online-eyebrow" class="eyebrow"><span class="dot"></span><span data-i18n="online_eyebrow">STREAMING JUTAAN MUSIK ONLINE</span></p>
+            <h1 class="h-screen" data-i18n="online_title">Jelajah</h1>
           </div>
           <div class="search" id="online-search-wrap">
             <span class="material-icons-round">search</span>
-            <input type="text" id="online-search-input" placeholder="Cari musik online (SZA, Daniel Caesar, pop, dll)..." autocomplete="off" />
+            <input type="text" id="online-search-input" placeholder="Cari musik online (SZA, Daniel Caesar, pop, dll)..." data-i18n-placeholder="online_search_placeholder" autocomplete="off" />
             <!-- Recent Search Popover Online -->
             <div id="online-recent-popover" class="search-recent-popover hidden">
               <div class="recent-header">
-                <span class="recent-title">Riwayat Pencarian</span>
-                <button type="button" id="btn-clear-recent-online" class="btn-clear-recent">Hapus Semua</button>
+                <span class="recent-title" data-i18n="recent_searches">Riwayat Pencarian</span>
+                <button type="button" id="btn-clear-recent-online" class="btn-clear-recent" data-i18n="clear_all">Hapus Semua</button>
               </div>
               <div id="recent-list-online" class="recent-list">
                 <!-- Populated dynamically -->
@@ -269,19 +274,19 @@
         <div class="source-switcher" role="tablist" aria-label="Pilih Sumber Streaming Musik">
           <button id="src-yt" class="source-btn active" role="tab" aria-selected="true" data-source="youtube">
             <span class="material-icons-round">smart_display</span>
-            YouTube Music
+            <span data-i18n="source_yt">YouTube Music</span>
           </button>
           <button id="src-jamendo" class="source-btn" role="tab" aria-selected="false" data-source="jamendo">
             <span class="material-icons-round">library_music</span>
-            Jamendo (Bebas Royalti)
+            <span data-i18n="source_jamendo">Jamendo (Bebas Royalti)</span>
           </button>
         </div>
 
         <!-- Penala Genre -->
         <section class="tuner" aria-label="Penala genre">
           <div class="tuner-head">
-            <span>PUTAR PENALA</span>
-            <span>Saluran aktif: <b id="active-tuner-label">Trending</b></span>
+            <span data-i18n="tune_genre">PUTAR PENALA</span>
+            <span><span data-i18n="active_channel">Saluran aktif:</span> <b id="active-tuner-label">Trending</b></span>
           </div>
           <div class="ruler" aria-hidden="true"></div>
           <div class="stops" id="tuner-stops">
@@ -294,7 +299,7 @@
           <div class="action-left">
             <button id="online-play-all" class="btn btn-primary" aria-label="Putar semua lagu online">
               <span class="material-icons-round">play_arrow</span>
-              Putar semua
+              <span data-i18n="play_all">Putar semua</span>
             </button>
             <button id="online-shuffle" class="btn btn-ghost btn-icon" title="Acak" aria-label="Acak Putar Online">
               <span class="material-icons-round">shuffle</span>
@@ -306,17 +311,17 @@
         <div id="online-track-container" class="track-list-wrap">
           <div id="online-loading" class="loading-state hidden">
             <div class="spinner"></div>
-            <p id="online-loading-text">Mencari lagu...</p>
+            <p id="online-loading-text" data-i18n="loading_music">Mencari lagu...</p>
           </div>
           <div id="online-empty" class="empty-state hidden">
-            <h3>Tidak ada hasil</h3>
-            <p id="online-empty-text">Coba kata kunci atau penala genre lain.</p>
+            <h3 data-i18n="no_results">Tidak ada hasil</h3>
+            <p id="online-empty-text" data-i18n="no_results_sub">Coba kata kunci atau penala genre lain.</p>
           </div>
           <div id="online-track-list" class="track-list"></div>
           <div id="online-load-more-wrap" class="load-more-wrap hidden">
             <button id="btn-online-load-more" class="btn-load-more" type="button" aria-label="Muat lebih banyak lagu online">
               <span class="material-icons-round load-more-icon">expand_more</span>
-              <span id="btn-load-more-text">Muat lebih banyak lagu</span>
+              <span id="btn-load-more-text" data-i18n="load_more_btn">Muat lebih banyak lagu</span>
               <div id="btn-load-more-spinner" class="spinner-sm hidden"></div>
             </button>
           </div>
@@ -327,12 +332,12 @@
       <section id="view-favorites" class="tab-view hidden">
         <div class="view-header">
           <div>
-            <p class="eyebrow"><span class="dot"></span>FAVORITMU</p>
-            <h1 class="h-screen">Favorit</h1>
+            <p class="eyebrow"><span class="dot"></span><span data-i18n="fav_eyebrow">FAVORITMU</span></p>
+            <h1 class="h-screen" data-i18n="fav_title">Favorit</h1>
           </div>
           <div class="search">
             <span class="material-icons-round">search</span>
-            <input type="text" id="fav-search-input" placeholder="Cari dalam favorit..." autocomplete="off" />
+            <input type="text" id="fav-search-input" placeholder="Cari dalam favorit..." data-i18n-placeholder="fav_search_placeholder" autocomplete="off" />
           </div>
         </div>
 
@@ -340,7 +345,7 @@
           <div class="action-left">
             <button id="fav-play-all" class="btn btn-primary" disabled aria-label="Putar semua lagu favorit">
               <span class="material-icons-round">play_arrow</span>
-              Putar semua
+              <span data-i18n="play_all">Putar semua</span>
             </button>
             <button id="fav-shuffle" class="btn btn-ghost btn-icon" disabled title="Acak" aria-label="Acak Favorit">
               <span class="material-icons-round">shuffle</span>
@@ -363,16 +368,16 @@
           </div>
 
           <div class="target-info">
-            <p class="eyebrow" style="letter-spacing: .2em;">PIRINGAN KOSONG</p>
-            <h2 class="h-empty-title">Belum ada lagu<br />favorit</h2>
-            <p class="empty-desc">Klik ikon hati pada lagu apa saja untuk menambahkannya ke favorit.</p>
+            <p class="eyebrow" style="letter-spacing: .2em;" data-i18n="empty_fav_eyebrow">PIRINGAN KOSONG</p>
+            <h2 class="h-empty-title" data-i18n="empty_fav_title">Belum ada lagu<br />favorit</h2>
+            <p class="empty-desc" data-i18n="empty_fav_desc">Klik ikon hati pada lagu apa saja untuk menambahkannya ke favorit.</p>
             <div class="empty-actions">
               <button id="fav-go-online" class="btn btn-primary">
                 <span class="material-icons-round">language</span>
-                Jelajahi musik online
+                <span data-i18n="btn_fav_explore">Jelajahi musik online</span>
               </button>
               <button id="fav-go-lib" class="btn btn-ghost">
-                Buka perpustakaan
+                <span data-i18n="btn_fav_lib">Buka perpustakaan</span>
               </button>
             </div>
           </div>
@@ -385,11 +390,11 @@
       <section id="view-downloads" class="tab-view hidden">
         <!-- Top Breadcrumb & Search Header -->
         <div class="dl-top-bar">
-          <div class="dl-breadcrumb">Perpustakaan / Unduhan</div>
+          <div class="dl-breadcrumb" data-i18n="dl_breadcrumb">Perpustakaan / Unduhan</div>
           <div class="dl-top-right">
             <div class="dl-search">
               <span class="material-icons-round">search</span>
-              <input type="text" id="dl-search-input" placeholder="Cari di koleksi unduhan..." autocomplete="off" />
+              <input type="text" id="dl-search-input" placeholder="Cari di koleksi unduhan..." data-i18n-placeholder="dl_search_placeholder" autocomplete="off" />
             </div>
             <div class="dl-avatar" title="Profil Pengguna">OM</div>
           </div>
@@ -400,10 +405,10 @@
           <div class="dl-hero-content">
             <div class="dl-hero-tag">
               <span class="material-icons-round">check</span>
-              <span>TERSEDIA OFFLINE</span>
+              <span data-i18n="dl_tag">TERSEDIA OFFLINE</span>
             </div>
-            <h1 class="dl-hero-heading">Musik favorit.<br>Tanpa batas sinyal.</h1>
-            <p class="dl-hero-sub">Semua lagu unduhanmu, dalam satu ruang. Siap menemani kapan pun kamu mau.</p>
+            <h1 class="dl-hero-heading" data-i18n="dl_hero_heading">Musik favorit.<br>Tanpa batas sinyal.</h1>
+            <p class="dl-hero-sub" data-i18n="dl_hero_sub">Semua lagu unduhanmu, dalam satu ruang. Siap menemani kapan pun kamu mau.</p>
             <div class="dl-hero-stats">
               <span id="dl-stats-count">0 lagu tersimpan</span>
               <span class="dl-stats-sep">·</span>
@@ -424,10 +429,10 @@
         <!-- Main Downloads Card -->
         <div class="dl-content-card">
           <div class="dl-content-header">
-            <h2 class="dl-content-title">Lagu unduhan</h2>
+            <h2 class="dl-content-title" data-i18n="dl_card_title">Lagu unduhan</h2>
             <button id="btn-open-dl-folder" class="btn-dl-folder" title="Buka folder unduhan di File Explorer">
               <span class="material-icons-round">folder_open</span>
-              <span>Buka folder</span>
+              <span data-i18n="dl_open_folder">Buka folder</span>
             </button>
           </div>
 
@@ -435,7 +440,7 @@
             <div class="dl-actions-left">
               <button id="dl-play-all" class="btn-dl-play-all" aria-label="Putar semua lagu unduhan">
                 <span class="material-icons-round">play_arrow</span>
-                <span>Putar semua</span>
+                <span data-i18n="play_all">Putar semua</span>
               </button>
               <button id="dl-shuffle" class="btn-dl-shuffle" title="Acak Lagu Unduhan" aria-label="Acak Unduhan">
                 <span class="material-icons-round">shuffle</span>
@@ -443,9 +448,9 @@
             </div>
             <div class="dl-sort-wrap">
               <select id="dl-sort-select" class="dl-sort-select" aria-label="Urutkan unduhan">
-                <option value="recent">Terbaru</option>
-                <option value="title">Judul (A–Z)</option>
-                <option value="duration">Durasi</option>
+                <option value="recent" data-i18n="sort_recent">Terbaru</option>
+                <option value="title" data-i18n="sort_title">Judul (A–Z)</option>
+                <option value="duration" data-i18n="sort_duration">Durasi</option>
               </select>
             </div>
           </div>
@@ -453,9 +458,9 @@
           <!-- Table Header -->
           <div class="dl-table-header">
             <div class="dl-th dl-th-num">#</div>
-            <div class="dl-th dl-th-title">JUDUL LAGU</div>
-            <div class="dl-th dl-th-source">SUMBER</div>
-            <div class="dl-th dl-th-dur">DURASI</div>
+            <div class="dl-th dl-th-title" data-i18n="dl_th_title">JUDUL LAGU</div>
+            <div class="dl-th dl-th-source" data-i18n="dl_th_source">SUMBER</div>
+            <div class="dl-th dl-th-dur" data-i18n="dl_th_dur">DURASI</div>
           </div>
 
           <!-- Empty State -->
@@ -463,8 +468,8 @@
             <div class="dl-empty-disc">
               <span class="material-icons-round">cloud_download</span>
             </div>
-            <h3>Belum ada lagu unduhan</h3>
-            <p>Unduh lagu dari tab "Jelajah" atau gunakan tombol tautan di bilah kiri untuk menyimpan lagu offline.</p>
+            <h3 data-i18n="dl_empty_title">Belum ada lagu unduhan</h3>
+            <p data-i18n="dl_empty_desc">Unduh lagu dari tab "Jelajah" atau gunakan tombol tautan di bilah kiri untuk menyimpan lagu offline.</p>
           </div>
 
           <!-- Track List Rows Container -->
@@ -473,7 +478,7 @@
           <!-- Footer Note -->
           <div class="dl-footer-note">
             <span class="material-icons-round">headphones</span>
-            <span>Tersimpan di perangkatmu. Nikmati musik tanpa koneksi internet.</span>
+            <span data-i18n="dl_footer_note">Tersimpan di perangkatmu. Nikmati musik tanpa koneksi internet.</span>
           </div>
         </div>
       </section>
@@ -484,12 +489,12 @@
         <div id="playlist-overview" class="pl-subview">
           <div class="view-header">
             <div>
-              <p class="eyebrow"><span class="dot" style="background:var(--warn)"></span>DAFTAR PUTAR</p>
-              <h1 class="h-screen">Playlist</h1>
+              <p class="eyebrow"><span class="dot" style="background:var(--warn)"></span><span data-i18n="pl_eyebrow">DAFTAR PUTAR</span></p>
+              <h1 class="h-screen" data-i18n="pl_title">Playlist</h1>
             </div>
             <div class="search">
               <span class="material-icons-round">search</span>
-              <input type="text" id="pl-search-input" placeholder="Cari playlist..." autocomplete="off" />
+              <input type="text" id="pl-search-input" placeholder="Cari playlist..." data-i18n-placeholder="pl_search_placeholder" autocomplete="off" />
             </div>
           </div>
 
@@ -497,11 +502,11 @@
             <div class="action-left">
               <button id="btn-new-playlist" class="btn btn-primary" aria-label="Buat Playlist Baru">
                 <span class="material-icons-round">add</span>
-                Playlist baru
+                <span data-i18n="btn_new_pl">Playlist baru</span>
               </button>
               <div class="sort-chips">
-                <button id="pl-sort-recent" class="chip-sort active" data-sort="recent">Terbaru</button>
-                <button id="pl-sort-name" class="chip-sort" data-sort="name">Nama A–Z</button>
+                <button id="pl-sort-recent" class="chip-sort active" data-sort="recent" data-i18n="sort_recent">Terbaru</button>
+                <button id="pl-sort-name" class="chip-sort" data-sort="name" data-i18n="sort_name">Nama A–Z</button>
               </div>
             </div>
             <span id="pl-total-count" class="badge-count">0 playlist</span>
@@ -517,7 +522,7 @@
         <div id="playlist-detail" class="pl-subview hidden">
           <button id="btn-back-playlists" class="btn-back" aria-label="Kembali ke semua playlist">
             <span class="material-icons-round">arrow_back</span>
-            Semua playlist
+            <span data-i18n="btn_back_pl">Semua playlist</span>
           </button>
 
           <div class="pl-detail-hero">
@@ -536,7 +541,7 @@
               <div class="controls" style="margin-top: 18px;">
                 <button id="pl-detail-play-all" class="btn btn-primary" aria-label="Putar semua isi playlist">
                   <span class="material-icons-round">play_arrow</span>
-                  Putar semua
+                  <span data-i18n="play_all">Putar semua</span>
                 </button>
                 <button id="pl-detail-shuffle" class="btn btn-ghost btn-icon" title="Acak" aria-label="Acak Playlist">
                   <span class="material-icons-round">shuffle</span>
@@ -553,7 +558,7 @@
 
           <div class="pl-track-section">
             <div class="koleksi-bar">
-              <h2 class="section-title">Isi playlist</h2>
+              <h2 class="section-title" data-i18n="pl_detail_songs">Isi playlist</h2>
               <span id="pl-detail-track-count" class="badge-count">0 lagu</span>
             </div>
 
@@ -561,8 +566,336 @@
 
             <button id="btn-add-to-pl-picker" class="btn btn-dashed add-to-pl-btn">
               <span class="material-icons-round">add</span>
-              Tambah lagu dari perpustakaan
+              <span data-i18n="btn_add_to_pl_picker">Tambah lagu dari perpustakaan</span>
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 6. Layar Pengaturan (Settings) ────────────────────────────── -->
+      <section id="view-settings" class="tab-view hidden">
+        <div class="settings-scroll-container">
+          <div class="view-header">
+            <div>
+              <p class="eyebrow"><span class="dot" style="background:var(--cool)"></span><span data-i18n="settings_eyebrow">MUSIKKU · PENGATURAN</span></p>
+              <h1 class="h-screen" data-i18n="settings_title">Pengaturan</h1>
+            </div>
+            <div class="settings-header-badge">
+              <span class="material-icons-round">tune</span>
+              <span data-i18n="settings_badge">Preferensi & Sistem</span>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <!-- 1. Tema Tampilan -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(22, 140, 222, 0.12); color: var(--accent);">
+                  <span class="material-icons-round">palette</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_theme_title">Tema & Tampilan</h2>
+                  <p class="settings-card-desc" data-i18n="settings_theme_desc">Pilih gaya visual yang paling nyaman untuk matamu</p>
+                </div>
+              </div>
+
+              <div class="theme-options-grid">
+                <!-- Theme Option 1: Light Sky Blue -->
+                <div class="theme-option-card active" data-theme="light" role="button" tabindex="0">
+                  <div class="theme-preview-box preview-light">
+                    <div class="preview-bar"></div>
+                    <div class="preview-circle"></div>
+                  </div>
+                  <div class="theme-option-info">
+                    <span class="theme-name">Light Sky Blue</span>
+                    <span class="theme-tag">Default Desktop</span>
+                  </div>
+                  <span class="material-icons-round theme-check-icon">check_circle</span>
+                </div>
+
+                <!-- Theme Option 2: Dark Emerald -->
+                <div class="theme-option-card" data-theme="emerald" role="button" tabindex="0">
+                  <div class="theme-preview-box preview-emerald">
+                    <div class="preview-bar"></div>
+                    <div class="preview-circle"></div>
+                  </div>
+                  <div class="theme-option-info">
+                    <span class="theme-name">Dark Emerald</span>
+                    <span class="theme-tag">Gaya MusikKu Android</span>
+                  </div>
+                  <span class="material-icons-round theme-check-icon">check_circle</span>
+                </div>
+
+                <!-- Theme Option 3: Midnight Obsidian -->
+                <div class="theme-option-card" data-theme="dark" role="button" tabindex="0">
+                  <div class="theme-preview-box preview-dark">
+                    <div class="preview-bar"></div>
+                    <div class="preview-circle"></div>
+                  </div>
+                  <div class="theme-option-info">
+                    <span class="theme-name">Midnight Obsidian</span>
+                    <span class="theme-tag">Dark Slate Elegan</span>
+                  </div>
+                  <span class="material-icons-round theme-check-icon">check_circle</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Bahasa Aplikasi (Language) -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(99, 102, 241, 0.12); color: #6366f1;">
+                  <span class="material-icons-round">language</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_lang_title">Bahasa Aplikasi</h2>
+                  <p class="settings-card-desc" data-i18n="settings_lang_desc">Pilih bahasa tampilan antarmuka untuk MusikKu</p>
+                </div>
+              </div>
+
+              <div class="language-options-grid">
+                <!-- Indonesia -->
+                <div class="lang-option-card active" data-lang="id" role="button" tabindex="0">
+                  <div class="lang-flag">🇮🇩</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">Bahasa Indonesia</span>
+                    <span class="lang-native">Indonesia</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+
+                <!-- English -->
+                <div class="lang-option-card" data-lang="en" role="button" tabindex="0">
+                  <div class="lang-flag">🇬🇧</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">English</span>
+                    <span class="lang-native">English</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+
+                <!-- Mandarin -->
+                <div class="lang-option-card" data-lang="zh" role="button" tabindex="0">
+                  <div class="lang-flag">🇨🇳</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">Mandarin (中文)</span>
+                    <span class="lang-native">简体中文</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+
+                <!-- Portugis -->
+                <div class="lang-option-card" data-lang="pt" role="button" tabindex="0">
+                  <div class="lang-flag">🇵🇹</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">Português</span>
+                    <span class="lang-native">Português</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+
+                <!-- Rusia -->
+                <div class="lang-option-card" data-lang="ru" role="button" tabindex="0">
+                  <div class="lang-flag">🇷🇺</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">Русский</span>
+                    <span class="lang-native">Русский язык</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Pemutaran & Audio -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                  <span class="material-icons-round">graphic_eq</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_audio_title">Pemutaran & Audio</h2>
+                  <p class="settings-card-desc" data-i18n="settings_audio_desc">Kontrol pengatur waktu tidur dan alur pemutaran musik</p>
+                </div>
+              </div>
+
+              <!-- Item: Sleep Timer -->
+              <div class="settings-item">
+                <div class="settings-item-text">
+                  <span class="settings-item-title" data-i18n="settings_timer_title">Sleep Timer (Pengatur Waktu Tidur)</span>
+                  <span class="settings-item-sub" id="sleep-timer-status-text" data-i18n="settings_timer_sub">Otomatis menjeda musik saat waktu habis · Tidak aktif</span>
+                </div>
+                <div class="sleep-timer-pills">
+                  <button type="button" class="btn-timer-pill active" data-mins="0" data-i18n="settings_timer_off">Mati</button>
+                  <button type="button" class="btn-timer-pill" data-mins="15">15m</button>
+                  <button type="button" class="btn-timer-pill" data-mins="30">30m</button>
+                  <button type="button" class="btn-timer-pill" data-mins="45">45m</button>
+                  <button type="button" class="btn-timer-pill" data-mins="60">60m</button>
+                </div>
+              </div>
+
+              <!-- Item: Auto-Play Next -->
+              <div class="settings-item">
+                <div class="settings-item-text">
+                  <span class="settings-item-title" data-i18n="settings_autoplay_title">Putar Otomatis Lagu Berikutnya</span>
+                  <span class="settings-item-sub" data-i18n="settings_autoplay_sub">Lanjutkan lagu berikutnya dalam antrean setelah lagu saat ini berakhir</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-autoplay" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- Item: Audio Quality -->
+              <div class="settings-item">
+                <div class="settings-item-text">
+                  <span class="settings-item-title" data-i18n="settings_quality_title">Kualitas Streaming Online</span>
+                  <span class="settings-item-sub" data-i18n="settings_quality_sub">Pilih kompromi antara kualitas audio terbaik dan efisiensi kuota data</span>
+                </div>
+                <select id="setting-audio-quality" class="settings-select">
+                  <option value="high" data-i18n="quality_high">Tinggi (256 - 320 kbps)</option>
+                  <option value="standard" selected data-i18n="quality_std">Standar (160 kbps)</option>
+                  <option value="saver" data-i18n="quality_low">Hemat Kuota (96 kbps)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 3. Folder & Perpustakaan Musik -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b;">
+                  <span class="material-icons-round">folder_special</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_folders_title">Folder & Penyimpanan Musik</h2>
+                  <p class="settings-card-desc" data-i18n="settings_folders_desc">Lokasi folder di komputermu yang dipindai untuk koleksi lagu lokal</p>
+                </div>
+              </div>
+
+              <div class="settings-folder-list" id="settings-folder-list">
+                <!-- Dynamically populated folder rows -->
+              </div>
+
+              <div class="settings-folder-actions">
+                <button type="button" id="btn-settings-add-folder" class="btn btn-secondary">
+                  <span class="material-icons-round">create_new_folder</span>
+                  <span data-i18n="btn_settings_add_folder">Tambah Folder</span>
+                </button>
+                <button type="button" id="btn-settings-rescan" class="btn btn-secondary">
+                  <span class="material-icons-round">refresh</span>
+                  <span data-i18n="btn_settings_rescan">Pindai Ulang Koleksi</span>
+                </button>
+                <button type="button" id="btn-settings-open-downloads" class="btn btn-secondary">
+                  <span class="material-icons-round">folder_open</span>
+                  <span data-i18n="btn_settings_open_dl">Buka Folder Unduhan</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 4. Pintasan Keyboard -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6;">
+                  <span class="material-icons-round">keyboard</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_shortcuts_title">Pintasan Keyboard</h2>
+                  <p class="settings-card-desc" data-i18n="settings_shortcuts_desc">Kendalikan musik lebih cepat tanpa menyentuh mouse</p>
+                </div>
+              </div>
+
+              <div class="shortcuts-table">
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_play_pause">Putar / Jeda musik</span>
+                  <kbd class="shortcut-key">Spasi</kbd>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_next">Lagu berikutnya</span>
+                  <div class="shortcut-combo"><kbd class="shortcut-key">Ctrl</kbd> + <kbd class="shortcut-key">→</kbd></div>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_prev">Lagu sebelumnya</span>
+                  <div class="shortcut-combo"><kbd class="shortcut-key">Ctrl</kbd> + <kbd class="shortcut-key">←</kbd></div>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_vol">Volume Naik / Turun</span>
+                  <div class="shortcut-combo"><kbd class="shortcut-key">Ctrl</kbd> + <kbd class="shortcut-key">↑ / ↓</kbd></div>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_mute">Bisukan suara (Mute / Unmute)</span>
+                  <kbd class="shortcut-key">M</kbd>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_fav">Tandai Favorit lagu saat ini</span>
+                  <kbd class="shortcut-key">F</kbd>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-action" data-i18n="shortcut_repeat">Beralih mode repeat (Ulang)</span>
+                  <kbd class="shortcut-key">L</kbd>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Data & Cache -->
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-icon-wrap" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">
+                  <span class="material-icons-round">cleaning_services</span>
+                </div>
+                <div>
+                  <h2 class="settings-card-title" data-i18n="settings_data_title">Data & Pembersihan</h2>
+                  <p class="settings-card-desc" data-i18n="settings_data_desc">Kelola cache lokal dan riwayat pencarian aplikasi</p>
+                </div>
+              </div>
+
+              <div class="settings-item">
+                <div class="settings-item-text">
+                  <span class="settings-item-title" data-i18n="settings_clear_searches_title">Riwayat Pencarian</span>
+                  <span class="settings-item-sub" data-i18n="settings_clear_searches_sub">Hapus semua riwayat kata kunci pencarian perpustakaan dan online</span>
+                </div>
+                <button type="button" id="btn-settings-clear-searches" class="btn btn-secondary btn-sm">
+                  <span class="material-icons-round">delete_sweep</span>
+                  <span data-i18n="btn_settings_clear_history">Hapus Riwayat</span>
+                </button>
+              </div>
+
+              <div class="settings-item">
+                <div class="settings-item-text">
+                  <span class="settings-item-title" data-i18n="settings_reset_title">Reset Pengaturan</span>
+                  <span class="settings-item-sub" data-i18n="settings_reset_sub">Kembalikan tema tampilan dan preferensi pemutar ke setelan awal pabrik</span>
+                </div>
+                <button type="button" id="btn-settings-reset-all" class="btn btn-outline-danger btn-sm">
+                  <span class="material-icons-round">restart_alt</span>
+                  <span data-i18n="btn_settings_reset">Reset Setelan</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 6. Tentang MusikKu -->
+            <div class="settings-card settings-card-about">
+              <div class="about-hero">
+                <div class="about-logo">
+                  <span class="material-icons-round">music_note</span>
+                </div>
+                <div class="about-meta">
+                  <h3 class="about-app-name">MusikKu Desktop</h3>
+                  <div class="about-version-badges">
+                    <span class="badge-pill-accent">Versi 1.0.0</span>
+                    <span class="badge-pill-neutral">Electron + Node.js</span>
+                    <span class="badge-pill-status">Status: Stabil</span>
+                  </div>
+                  <p class="about-desc" data-i18n="about_app_desc">
+                    Pemutar musik modern berkonsep frosted glassmorphism & vinyl dial player.
+                    Mendukung pemutaran lagu lokal offline, streaming online, lirik lagu, dan pengunduhan langsung.
+                  </p>
+                  <div class="about-credits">
+                    <span>Dikembangkan dengan ❤️ oleh <strong>Botann001</strong></span>
+                    <span class="credits-dot">·</span>
+                    <span>Hak Cipta © 2026 MusikKu</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -634,7 +967,7 @@
     <header class="np-topbar">
       <button id="np-btn-close" class="np-close-btn" title="Tutup pemutar" aria-label="Tutup pemutar">
         <span class="material-icons-round">keyboard_arrow_down</span>
-        <span>Tutup pemutar</span>
+        <span data-i18n="np_close">Tutup pemutar</span>
       </button>
 
       <div class="np-source-badge" id="np-source-badge">
@@ -681,7 +1014,7 @@
       <!-- Center: Track Title, Waveform Soundwave & Playback Controls -->
       <div class="np-info-area">
         <div class="np-eyebrow-row">
-          <span class="np-tag-eyebrow">SEDANG DIPUTAR</span>
+          <span class="np-tag-eyebrow" data-i18n="np_playing_eyebrow">SEDANG DIPUTAR</span>
           <span id="np-badge-type" class="badge-online">ONLINE</span>
         </div>
 
@@ -747,8 +1080,8 @@
         <div class="np-glass-card">
           <!-- Segmented Tab Switcher [ Antrean ] [ Lirik ] -->
           <div class="np-tab-switcher">
-            <button id="np-tab-queue" class="np-tab-btn" aria-selected="false">Antrean</button>
-            <button id="np-tab-lyrics" class="np-tab-btn active" aria-selected="true">Lirik</button>
+            <button id="np-tab-queue" class="np-tab-btn" aria-selected="false" data-i18n="np_tab_queue">Antrean</button>
+            <button id="np-tab-lyrics" class="np-tab-btn active" aria-selected="true" data-i18n="np_tab_lyrics">Lirik</button>
           </div>
 
           <!-- Tab Content: Lirik -->
@@ -756,11 +1089,11 @@
             <div id="np-lyrics-container" class="np-lyrics-container">
               <div id="np-lyrics-loading" class="np-lyrics-status hidden">
                 <div class="spinner"></div>
-                <p>Memuat lirik dari LRCLIB...</p>
+                <p data-i18n="np_lrc_loading">Memuat lirik dari LRCLIB...</p>
               </div>
               <div id="np-lyrics-empty" class="np-lyrics-status hidden">
                 <span class="material-icons-round status-icon">lyrics</span>
-                <p id="np-lyrics-empty-text">Lirik belum tersedia untuk lagu ini</p>
+                <p id="np-lyrics-empty-text" data-i18n="np_lrc_empty">Lirik belum tersedia untuk lagu ini</p>
               </div>
               <div id="np-lyrics-list" class="np-lyrics-list">
                 <!-- Timed lyrics rows -->
@@ -772,15 +1105,15 @@
                 <button id="lrc-btn-dec" class="lrc-pill-btn" title="Kecilkan Ukuran Teks">A−</button>
                 <button id="lrc-btn-inc" class="lrc-pill-btn" title="Besarkan Ukuran Teks">A+</button>
               </div>
-              <span class="lrc-hint">Klik baris untuk melompat ke bagian itu.</span>
-              <button id="lrc-btn-follow" class="lrc-follow-btn active" title="Otomatis gulir mengikuti lagu">Ikuti lagu</button>
+              <span class="lrc-hint" data-i18n="np_lrc_hint">Klik baris untuk melompat ke bagian itu.</span>
+              <button id="lrc-btn-follow" class="lrc-follow-btn active" title="Otomatis gulir mengikuti lagu" data-i18n="np_lrc_follow">Ikuti lagu</button>
             </div>
           </div>
 
           <!-- Tab Content: Antrean -->
           <div id="np-panel-queue" class="np-panel hidden">
             <div class="np-queue-body">
-              <div class="np-queue-subhead">SEDANG DIPUTAR</div>
+              <div class="np-queue-subhead" data-i18n="np_queue_now">SEDANG DIPUTAR</div>
               <div class="np-queue-current-card" id="np-queue-current-card">
                 <div class="np-qc-disc">
                   <span class="material-icons-round">music_note</span>
@@ -803,9 +1136,9 @@
             <div class="np-queue-footer">
               <button id="np-btn-save-queue-pl" class="btn-save-queue-pl">
                 <span class="material-icons-round">add</span>
-                Simpan antrean jadi playlist
+                <span data-i18n="np_save_queue_pl">Simpan antrean jadi playlist</span>
               </button>
-              <button id="np-btn-clear-queue" class="btn-clear-queue">Kosongkan antrean</button>
+              <button id="np-btn-clear-queue" class="btn-clear-queue" data-i18n="np_clear_queue">Kosongkan antrean</button>
             </div>
           </div>
         </div>
@@ -822,8 +1155,8 @@
             <span class="material-icons-round">cloud_download</span>
           </div>
           <div>
-            <h3 id="dl-modal-title">Tools Download Musik</h3>
-            <p class="modal-sub">Unduh file audio langsung dari URL</p>
+            <h3 id="dl-modal-title" data-i18n="dl_modal_title">Tools Download Musik</h3>
+            <p class="modal-sub" data-i18n="dl_modal_sub">Unduh file audio langsung dari URL</p>
           </div>
         </div>
         <button id="btn-close-modal" class="modal-close-btn" title="Tutup" aria-label="Tutup Modal">
@@ -833,16 +1166,16 @@
 
       <div class="modal-body">
         <div class="form-group">
-          <label for="input-dl-url">URL File Audio (MP3 / Direct Stream) *</label>
+          <label for="input-dl-url" data-i18n="dl_modal_url_label">URL File Audio (MP3 / Direct Stream) *</label>
           <input type="url" id="input-dl-url" placeholder="https://example.com/audio/song.mp3" />
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label for="input-dl-title">Judul Lagu</label>
+            <label for="input-dl-title" data-i18n="dl_modal_title_label">Judul Lagu</label>
             <input type="text" id="input-dl-title" placeholder="cth: Lagu Favorit" />
           </div>
           <div class="form-group">
-            <label for="input-dl-artist">Nama Artis</label>
+            <label for="input-dl-artist" data-i18n="dl_modal_artist_label">Nama Artis</label>
             <input type="text" id="input-dl-artist" placeholder="cth: Penyanyi" />
           </div>
         </div>
@@ -856,10 +1189,10 @@
       </div>
 
       <div class="modal-footer">
-        <button id="btn-cancel-modal" class="btn btn-ghost">Batal</button>
+        <button id="btn-cancel-modal" class="btn btn-ghost" data-i18n="btn_cancel">Batal</button>
         <button id="btn-start-url-download" class="btn btn-primary">
           <span class="material-icons-round">download</span>
-          Mulai Unduh
+          <span data-i18n="btn_start_dl">Mulai Unduh</span>
         </button>
       </div>
     </div>
@@ -874,8 +1207,8 @@
             <span class="material-icons-round">queue_music</span>
           </div>
           <div>
-            <h3 id="pl-modal-title">Playlist Baru</h3>
-            <p class="modal-sub">Kelompokkan lagu-lagu favoritmu</p>
+            <h3 id="pl-modal-title" data-i18n="pl_modal_title">Playlist Baru</h3>
+            <p class="modal-sub" data-i18n="pl_modal_sub">Kelompokkan lagu-lagu favoritmu</p>
           </div>
         </div>
         <button id="btn-close-pl-modal" class="modal-close-btn" title="Tutup" aria-label="Tutup Modal">
@@ -885,12 +1218,12 @@
 
       <div class="modal-body">
         <div class="form-group">
-          <label for="input-pl-name">Nama Playlist</label>
+          <label for="input-pl-name" data-i18n="pl_modal_name_label">Nama Playlist</label>
           <input type="text" id="input-pl-name" placeholder="cth: Santai Malam" maxlength="40" autocomplete="off" spellcheck="false" />
         </div>
 
         <div class="form-group">
-          <label>Warna Sampul</label>
+          <label data-i18n="pl_modal_cover_label">Warna Sampul</label>
           <div class="gradient-picker" id="pl-gradient-picker">
             <!-- 8 presets populated dynamically -->
           </div>
@@ -898,8 +1231,8 @@
       </div>
 
       <div class="modal-footer">
-        <button id="btn-cancel-pl-modal" class="btn btn-ghost">Batal</button>
-        <button id="btn-save-playlist" class="btn btn-primary">
+        <button id="btn-cancel-pl-modal" class="btn btn-ghost" data-i18n="btn_cancel">Batal</button>
+        <button id="btn-save-playlist" class="btn btn-primary" data-i18n="btn_save_pl">
           Simpan Playlist
         </button>
       </div>

@@ -18,7 +18,8 @@ interface YouTubeApiService {
     suspend fun searchVideos(
         @Url endpoint: String,
         @Query("q") query: String,
-        @Query("type") type: String = "video"
+        @Query("type") type: String = "video",
+        @Query("page") page: Int = 1
     ): List<YouTubeSearchItemDto>
 
     /**

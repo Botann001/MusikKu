@@ -64,7 +64,16 @@
     isNowPlayingOpen: false,
     npActiveTab: 'lyrics', // 'lyrics' | 'queue'
     lyricsFontSize: 16,
-    autoScrollLyrics: true
+    autoScrollLyrics: true,
+
+    // Preferensi & Pengaturan
+    theme: localStorage.getItem('musikku_desktop_theme') || 'light',
+    language: localStorage.getItem('musikku_desktop_language') || 'id',
+    autoPlayNext: localStorage.getItem('musikku_autoplay') !== 'false',
+    audioQuality: localStorage.getItem('musikku_audio_quality') || 'standard',
+    sleepTimerMinutes: 0,
+    sleepTimerRemaining: 0,
+    sleepTimerInterval: null
   };
 
   const audio = new Audio();
@@ -843,6 +852,8 @@
       renderDownloads();
     } else if (tabName === 'playlists') {
       showPlaylistOverview();
+    } else if (tabName === 'settings') {
+      renderSettingsView();
     }
   }
 
@@ -1653,8 +1664,13 @@
     if (state.repeatMode === 2) {
       audio.currentTime = 0;
       audio.play();
-    } else {
+    } else if (state.autoPlayNext !== false) {
       playNext();
+    } else {
+      audio.pause();
+      state.isPlaying = false;
+      updatePlayerUI();
+      renderCurrentScreenTracks();
     }
   });
 
@@ -1803,7 +1819,7 @@
   // ─── Volume Controls ───────────────────────────────────────────────────────
   function updateVolumeSliderFill(slider, pct) {
     if (!slider) return;
-    slider.style.background = `linear-gradient(to right, #168CDE 0%, #168CDE ${pct}%, rgba(23, 53, 80, 0.14) ${pct}%, rgba(23, 53, 80, 0.14) 100%)`;
+    slider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--line-strong) ${pct}%, var(--line-strong) 100%)`;
   }
 
   function setVolume(val) {
@@ -2028,7 +2044,7 @@
         return;
       }
     }
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     if (e.code === 'Escape' && state.isNowPlayingOpen) {
       closeNowPlayingScreen();
       return;
@@ -2036,6 +2052,36 @@
     if (e.code === 'Space') {
       e.preventDefault();
       togglePlayPause();
+    } else if (e.ctrlKey && e.code === 'ArrowRight') {
+      e.preventDefault();
+      playNext();
+    } else if (e.ctrlKey && e.code === 'ArrowLeft') {
+      e.preventDefault();
+      playPrevious();
+    } else if (e.ctrlKey && e.code === 'ArrowUp') {
+      e.preventDefault();
+      setVolume(Math.min(1, state.volume + 0.05));
+    } else if (e.ctrlKey && e.code === 'ArrowDown') {
+      e.preventDefault();
+      setVolume(Math.max(0, state.volume - 0.05));
+    } else if (e.code === 'KeyM') {
+      e.preventDefault();
+      if (audio.muted || state.volume === 0) {
+        audio.muted = false;
+        setVolume(state.lastVolume || 0.8);
+      } else {
+        state.lastVolume = state.volume;
+        setVolume(0);
+      }
+    } else if (e.code === 'KeyF') {
+      if (state.currentSong) {
+        e.preventDefault();
+        toggleFavorite(state.currentSong);
+      }
+    } else if (e.code === 'KeyL') {
+      e.preventDefault();
+      state.repeatMode = (state.repeatMode + 1) % 3;
+      updatePlayerUI();
     }
   });
 
@@ -3861,8 +3907,1057 @@
 
   elements.btnAddFolder?.addEventListener('click', addFolder);
 
+  // ─── Layar Pengaturan (Settings Logic) ────────────────────────────────────
+  function applyTheme(themeName) {
+    state.theme = themeName || 'light';
+    localStorage.setItem('musikku_desktop_theme', state.theme);
+    if (state.theme === 'light') {
+      document.body.removeAttribute('data-theme');
+    } else {
+      document.body.setAttribute('data-theme', state.theme);
+    }
+    updateThemeCardsUI();
+  }
+
+  function updateThemeCardsUI() {
+    const cards = document.querySelectorAll('.theme-option-card');
+    cards.forEach(card => {
+      const t = card.dataset.theme;
+      card.classList.toggle('active', t === state.theme);
+    });
+  }
+
+  // ─── Kamus Terjemahan Multibahasa (i18n) ──────────────────────────────────
+  const TRANSLATIONS = {
+    id: {
+      nav_space: 'RUANG MUSIKMU',
+      nav_library: 'Perpustakaan',
+      nav_online: 'Jelajah online',
+      nav_favorites: 'Favorit',
+      nav_downloads: 'Unduhan',
+      nav_playlists: 'Playlist',
+      nav_settings: 'Pengaturan',
+      btn_add_folder: 'Tambah folder',
+      btn_dl_url: 'Download dari URL',
+      tagline: 'Musikmu. Ruangmu.',
+      lib_eyebrow: 'MUSIKKU · PERPUSTAKAAN',
+      lib_search_placeholder: 'Cari lagu, artis, album...',
+      recent_searches: 'Riwayat Pencarian',
+      clear_all: 'Hapus Semua',
+      popular_suggestions: 'Saran Populer',
+      now_playing_eyebrow: 'SEDANG DIPUTAR',
+      now_playing_empty: 'Pilih lagu dari perpustakaan atau jelajah',
+      collection_title: 'Koleksi',
+      play_all: 'Putar semua',
+      quick_add_folder_title: 'Tambah folder',
+      quick_add_folder_sub: 'Pindai musik dari komputermu',
+      quick_dl_title: 'Unduh dari URL',
+      quick_dl_sub: 'Tempel tautan, simpan offline',
+      empty_lib_title: 'Perpustakaan Kosong',
+      empty_lib_desc: 'Tambahkan folder musik dari komputermu untuk mulai mendengarkan.',
+      explore_eyebrow: 'STREAMING JUTAAN MUSIK ONLINE',
+      explore_heading: 'Jelajah',
+      explore_search_placeholder: 'Cari musik online (SZA, Daniel Caesar, pop, dll)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (Bebas Royalti)',
+      tuner_eyebrow: 'PUTAR PENALA',
+      active_channel: 'Saluran aktif:',
+      empty_search_title: 'Mulai Mencari Musik',
+      empty_search_desc: 'Ketik judul lagu, nama artis, atau album di bilah pencarian atas, atau putar penala genre untuk menemukan lagu menarik.',
+      load_more: 'Muat Lebih Banyak Lagu',
+      fav_eyebrow: 'FAVORITMU',
+      fav_title: 'Favorit',
+      fav_search_placeholder: 'Cari dalam favorit...',
+      empty_fav_eyebrow: 'PIRINGAN KOSONG',
+      empty_fav_title: 'Belum ada lagu<br />favorit',
+      empty_fav_desc: 'Klik ikon hati pada lagu apa saja untuk menambahkannya ke favorit.',
+      btn_fav_explore: 'Jelajahi musik online',
+      btn_fav_lib: 'Buka perpustakaan',
+      dl_breadcrumb: 'Perpustakaan / Unduhan',
+      dl_search_placeholder: 'Cari di koleksi unduhan...',
+      dl_tag: 'TERSEDIA OFFLINE',
+      dl_hero_heading: 'Musik favorit.<br>Tanpa batas sinyal.',
+      dl_hero_sub: 'Semua lagu unduhanmu, dalam satu ruang. Siap menemani kapan pun kamu mau.',
+      dl_card_title: 'Lagu unduhan',
+      dl_open_folder: 'Buka folder',
+      sort_recent: 'Terbaru',
+      sort_title: 'Judul (A–Z)',
+      sort_duration: 'Durasi',
+      sort_name: 'Nama A–Z',
+      dl_th_title: 'JUDUL LAGU',
+      dl_th_source: 'SUMBER',
+      dl_th_dur: 'DURASI',
+      dl_empty_title: 'Belum ada lagu unduhan',
+      dl_empty_desc: 'Unduh lagu dari tab "Jelajah" atau gunakan tombol tautan di bilah kiri untuk menyimpan lagu offline.',
+      dl_footer_note: 'Tersimpan di perangkatmu. Nikmati musik tanpa koneksi internet.',
+      pl_eyebrow: 'DAFTAR PUTAR',
+      pl_title: 'Playlist',
+      pl_search_placeholder: 'Cari playlist...',
+      btn_new_pl: 'Playlist baru',
+      btn_back_pl: 'Semua playlist',
+      pl_detail_songs: 'Isi playlist',
+      btn_add_to_pl_picker: 'Tambah lagu dari perpustakaan',
+      settings_eyebrow: 'MUSIKKU · PENGATURAN',
+      settings_title: 'Pengaturan',
+      settings_badge: 'Preferensi & Sistem',
+      settings_theme_title: 'Tema & Tampilan',
+      settings_theme_desc: 'Pilih gaya visual yang paling nyaman untuk matamu',
+      settings_lang_title: 'Bahasa Aplikasi',
+      settings_lang_desc: 'Pilih bahasa tampilan antarmuka untuk MusikKu',
+      settings_audio_title: 'Pemutaran & Audio',
+      settings_audio_desc: 'Kontrol pengatur waktu tidur dan alur pemutaran musik',
+      settings_timer_title: 'Sleep Timer (Pengatur Waktu Tidur)',
+      settings_timer_sub: 'Otomatis menjeda musik saat waktu habis · Tidak aktif',
+      settings_timer_off: 'Mati',
+      settings_autoplay_title: 'Putar Otomatis Lagu Berikutnya',
+      settings_autoplay_sub: 'Lanjutkan lagu berikutnya dalam antrean setelah lagu saat ini berakhir',
+      settings_quality_title: 'Kualitas Streaming Online',
+      settings_quality_sub: 'Pilih kompromi antara kualitas audio terbaik dan efisiensi kuota data',
+      quality_high: 'Tinggi (256 - 320 kbps)',
+      quality_std: 'Standar (160 kbps)',
+      quality_low: 'Hemat Kuota (96 kbps)',
+      settings_folders_title: 'Folder & Penyimpanan Musik',
+      settings_folders_desc: 'Lokasi folder di komputermu yang dipindai untuk koleksi lagu lokal',
+      btn_settings_add_folder: 'Tambah Folder',
+      btn_settings_rescan: 'Pindai Ulang Koleksi',
+      btn_settings_open_dl: 'Buka Folder Unduhan',
+      settings_shortcuts_title: 'Pintasan Keyboard',
+      settings_shortcuts_desc: 'Kendalikan musik lebih cepat tanpa menyentuh mouse',
+      shortcut_play_pause: 'Putar / Jeda musik',
+      shortcut_next: 'Lagu berikutnya',
+      shortcut_prev: 'Lagu sebelumnya',
+      shortcut_vol: 'Volume Naik / Turun',
+      shortcut_mute: 'Bisukan suara (Mute / Unmute)',
+      shortcut_fav: 'Tandai Favorit lagu saat ini',
+      shortcut_repeat: 'Beralih mode repeat (Ulang)',
+      settings_data_title: 'Data & Pembersihan',
+      settings_data_desc: 'Kelola cache lokal dan riwayat pencarian aplikasi',
+      settings_clear_searches_title: 'Riwayat Pencarian',
+      settings_clear_searches_sub: 'Hapus semua riwayat kata kunci pencarian perpustakaan dan online',
+      btn_settings_clear_history: 'Hapus Riwayat',
+      settings_reset_title: 'Reset Pengaturan',
+      settings_reset_sub: 'Kembalikan tema tampilan dan preferensi pemutar ke setelan awal pabrik',
+      btn_settings_reset: 'Reset Setelan',
+      about_app_desc: 'Pemutar musik modern berkonsep frosted glassmorphism & vinyl dial player. Mendukung pemutaran lagu lokal offline, streaming online, lirik lagu, dan pengunduhan langsung.',
+      np_close: 'Tutup pemutar',
+      change_photo: 'Ganti Foto',
+      np_playing_eyebrow: 'SEDANG DIPUTAR',
+      np_tab_queue: 'Antrean',
+      np_tab_lyrics: 'Lirik',
+      np_lrc_loading: 'Memuat lirik dari LRCLIB...',
+      np_lrc_empty: 'Lirik belum tersedia untuk lagu ini',
+      np_lrc_hint: 'Klik baris untuk melompat ke bagian itu.',
+      np_lrc_follow: 'Ikuti lagu',
+      np_queue_now: 'SEDANG DIPUTAR',
+      np_save_queue_pl: 'Simpan antrean jadi playlist',
+      np_clear_queue: 'Kosongkan antrean',
+      dl_modal_title: 'Tools Download Musik',
+      dl_modal_sub: 'Unduh file audio langsung dari URL',
+      dl_modal_url_label: 'URL File Audio (MP3 / Direct Stream) *',
+      dl_modal_title_label: 'Judul Lagu',
+      dl_modal_artist_label: 'Nama Artis',
+      btn_cancel: 'Batal',
+      btn_start_dl: 'Mulai Unduh',
+      pl_modal_title: 'Playlist Baru',
+      pl_modal_sub: 'Kelompokkan lagu-lagu favoritmu',
+      pl_modal_name_label: 'Nama Playlist',
+      pl_modal_cover_label: 'Warna Sampul',
+      btn_save_pl: 'Simpan Playlist',
+      toast_lang_changed: 'Bahasa berhasil diubah ke Bahasa Indonesia'
+    },
+    en: {
+      nav_space: 'YOUR MUSIC SPACE',
+      nav_library: 'Library',
+      nav_online: 'Explore online',
+      nav_favorites: 'Favorites',
+      nav_downloads: 'Downloads',
+      nav_playlists: 'Playlists',
+      nav_settings: 'Settings',
+      btn_add_folder: 'Add folder',
+      btn_dl_url: 'Download from URL',
+      tagline: 'Your music. Your space.',
+      lib_eyebrow: 'MUSIKKU · LIBRARY',
+      lib_search_placeholder: 'Search songs, artists, albums...',
+      recent_searches: 'Recent Searches',
+      clear_all: 'Clear All',
+      popular_suggestions: 'Popular Suggestions',
+      now_playing_eyebrow: 'NOW PLAYING',
+      now_playing_empty: 'Choose a song from library or explore',
+      collection_title: 'Collection',
+      play_all: 'Play all',
+      quick_add_folder_title: 'Add folder',
+      quick_add_folder_sub: 'Scan music from your computer',
+      quick_dl_title: 'Download from URL',
+      quick_dl_sub: 'Paste link, save offline',
+      empty_lib_title: 'Empty Library',
+      empty_lib_desc: 'Add music folders from your computer to start listening.',
+      explore_eyebrow: 'STREAM MILLIONS OF SONGS ONLINE',
+      explore_heading: 'Explore',
+      explore_search_placeholder: 'Search music online (SZA, Daniel Caesar, pop, etc)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (Royalty Free)',
+      tuner_eyebrow: 'TURN TUNER',
+      active_channel: 'Active channel:',
+      empty_search_title: 'Start Searching Music',
+      empty_search_desc: 'Type song title, artist, or album above, or turn the genre tuner.',
+      load_more: 'Load More Songs',
+      fav_eyebrow: 'YOUR FAVORITES',
+      fav_title: 'Favorites',
+      fav_search_placeholder: 'Search in favorites...',
+      empty_fav_eyebrow: 'EMPTY VINYL',
+      empty_fav_title: 'No favorite<br />songs yet',
+      empty_fav_desc: 'Click the heart icon on any song to add it to favorites.',
+      btn_fav_explore: 'Explore online music',
+      btn_fav_lib: 'Open library',
+      dl_breadcrumb: 'Library / Downloads',
+      dl_search_placeholder: 'Search in downloaded collection...',
+      dl_tag: 'AVAILABLE OFFLINE',
+      dl_hero_heading: 'Favorite music.<br>Without limits.',
+      dl_hero_sub: 'All your downloaded songs in one place. Ready to listen anytime.',
+      dl_card_title: 'Downloaded Songs',
+      dl_open_folder: 'Open folder',
+      sort_recent: 'Recent',
+      sort_title: 'Title (A–Z)',
+      sort_duration: 'Duration',
+      sort_name: 'Name A–Z',
+      dl_th_title: 'SONG TITLE',
+      dl_th_source: 'SOURCE',
+      dl_th_dur: 'DURATION',
+      dl_empty_title: 'No downloaded songs yet',
+      dl_empty_desc: 'Download songs from "Explore" tab or use the link button on sidebar to save offline.',
+      dl_footer_note: 'Stored on your device. Enjoy music without internet connection.',
+      pl_eyebrow: 'PLAYLISTS',
+      pl_title: 'Playlists',
+      pl_search_placeholder: 'Search playlists...',
+      btn_new_pl: 'New playlist',
+      btn_back_pl: 'All playlists',
+      pl_detail_songs: 'Playlist contents',
+      btn_add_to_pl_picker: 'Add song from library',
+      settings_eyebrow: 'MUSIKKU · SETTINGS',
+      settings_title: 'Settings',
+      settings_badge: 'Preferences & System',
+      settings_theme_title: 'Theme & Appearance',
+      settings_theme_desc: 'Choose visual style most comfortable for your eyes',
+      settings_lang_title: 'App Language',
+      settings_lang_desc: 'Choose interface display language for MusikKu',
+      settings_audio_title: 'Playback & Audio',
+      settings_audio_desc: 'Manage sleep timer and music playback behavior',
+      settings_timer_title: 'Sleep Timer',
+      settings_timer_sub: 'Automatically pauses playback when time is up · Inactive',
+      settings_timer_off: 'Off',
+      settings_autoplay_title: 'Auto-Play Next Song',
+      settings_autoplay_sub: 'Play the next song in queue when current song ends',
+      settings_quality_title: 'Online Streaming Quality',
+      settings_quality_sub: 'Choose compromise between highest audio quality and data efficiency',
+      quality_high: 'High (256 - 320 kbps)',
+      quality_std: 'Standard (160 kbps)',
+      quality_low: 'Data Saver (96 kbps)',
+      settings_folders_title: 'Music Folders & Storage',
+      settings_folders_desc: 'Folders on your computer scanned for local music files',
+      btn_settings_add_folder: 'Add Folder',
+      btn_settings_rescan: 'Rescan Collection',
+      btn_settings_open_dl: 'Open Downloads Folder',
+      settings_shortcuts_title: 'Keyboard Shortcuts',
+      settings_shortcuts_desc: 'Control music faster without touching the mouse',
+      shortcut_play_pause: 'Play / Pause music',
+      shortcut_next: 'Next song',
+      shortcut_prev: 'Previous song',
+      shortcut_vol: 'Volume Up / Down',
+      shortcut_mute: 'Mute / Unmute sound',
+      shortcut_fav: 'Toggle Favorite on current song',
+      shortcut_repeat: 'Toggle repeat mode',
+      settings_data_title: 'Data & Cleanup',
+      settings_data_desc: 'Manage local cache and search history',
+      settings_clear_searches_title: 'Search History',
+      settings_clear_searches_sub: 'Clear all search query history for library and online',
+      btn_settings_clear_history: 'Clear History',
+      settings_reset_title: 'Reset Settings',
+      settings_reset_sub: 'Restore appearance themes and player settings to defaults',
+      btn_settings_reset: 'Reset Settings',
+      about_app_desc: 'Modern music player featuring frosted glassmorphism & vinyl dial player. Supports offline playback, online streaming, synchronized lyrics, and direct downloading.',
+      np_close: 'Close player',
+      change_photo: 'Change Photo',
+      np_playing_eyebrow: 'NOW PLAYING',
+      np_tab_queue: 'Queue',
+      np_tab_lyrics: 'Lyrics',
+      np_lrc_loading: 'Loading lyrics from LRCLIB...',
+      np_lrc_empty: 'Lyrics not available for this song',
+      np_lrc_hint: 'Click a line to jump to that timestamp.',
+      np_lrc_follow: 'Auto-scroll',
+      np_queue_now: 'NOW PLAYING',
+      np_save_queue_pl: 'Save queue as playlist',
+      np_clear_queue: 'Clear queue',
+      dl_modal_title: 'Music Download Tool',
+      dl_modal_sub: 'Download audio file directly from URL',
+      dl_modal_url_label: 'Audio File URL (MP3 / Direct Stream) *',
+      dl_modal_title_label: 'Song Title',
+      dl_modal_artist_label: 'Artist Name',
+      btn_cancel: 'Cancel',
+      btn_start_dl: 'Start Download',
+      pl_modal_title: 'New Playlist',
+      pl_modal_sub: 'Group your favorite tracks',
+      pl_modal_name_label: 'Playlist Name',
+      pl_modal_cover_label: 'Cover Color',
+      btn_save_pl: 'Save Playlist',
+      toast_lang_changed: 'Language changed to English'
+    },
+    zh: {
+      nav_space: '你的音乐空间',
+      nav_library: '音乐库',
+      nav_online: '在线探索',
+      nav_favorites: '收藏夹',
+      nav_downloads: '下载',
+      nav_playlists: '歌单',
+      nav_settings: '设置',
+      btn_add_folder: '添加文件夹',
+      btn_dl_url: '从链接下载',
+      tagline: '你的音乐，你的专属空间。',
+      lib_eyebrow: 'MUSIKKU · 音乐库',
+      lib_search_placeholder: '搜索歌曲、歌手、专辑...',
+      recent_searches: '搜索历史',
+      clear_all: '清除全部',
+      popular_suggestions: '热门推荐',
+      now_playing_eyebrow: '正在播放',
+      now_playing_empty: '从音乐库或探索中选择歌曲',
+      collection_title: '音乐收藏',
+      play_all: '播放全部',
+      quick_add_folder_title: '添加文件夹',
+      quick_add_folder_sub: '扫描计算机中的本地音乐',
+      quick_dl_title: '从链接下载',
+      quick_dl_sub: '粘贴链接，离线保存',
+      empty_lib_title: '音乐库为空',
+      empty_lib_desc: '从计算机添加音乐文件夹以开始聆听。',
+      explore_eyebrow: '在线畅听海量音乐',
+      explore_heading: '探索',
+      explore_search_placeholder: '在线搜索音乐 (SZA, 周杰伦, 流行等)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (免版税)',
+      tuner_eyebrow: '流派旋钮',
+      active_channel: '当前频道：',
+      empty_search_title: '开始搜索音乐',
+      empty_search_desc: '在上方输入歌曲名称或转动流派旋钮发现精彩歌曲。',
+      load_more: '加载更多歌曲',
+      fav_eyebrow: '你的收藏',
+      fav_title: '收藏夹',
+      fav_search_placeholder: '在收藏夹中搜索...',
+      empty_fav_eyebrow: '唱片空空如也',
+      empty_fav_title: '暂无收藏歌曲',
+      empty_fav_desc: '点击任何歌曲上的心形图标即可加入收藏。',
+      btn_fav_explore: '探索在线音乐',
+      btn_fav_lib: '打开音乐库',
+      dl_breadcrumb: '音乐库 / 下载',
+      dl_search_placeholder: '在已下载歌曲中搜索...',
+      dl_tag: '离线可用',
+      dl_hero_heading: '心动音乐。<br>无网亦动听。',
+      dl_hero_sub: '所有已下载歌曲尽在此处，随时随地静心聆听。',
+      dl_card_title: '已下载歌曲',
+      dl_open_folder: '打开文件夹',
+      sort_recent: '最新',
+      sort_title: '标题 (A–Z)',
+      sort_duration: '时长',
+      sort_name: '名称 A–Z',
+      dl_th_title: '歌曲标题',
+      dl_th_source: '来源',
+      dl_th_dur: '时长',
+      dl_empty_title: '暂无下载歌曲',
+      dl_empty_desc: '从“探索”中下载歌曲或使用左侧栏链接保存离线音频。',
+      dl_footer_note: '已保存在您的设备中，无需网络连接畅享音乐。',
+      pl_eyebrow: '播放列表',
+      pl_title: '歌单',
+      pl_search_placeholder: '搜索歌单...',
+      btn_new_pl: '新建歌单',
+      btn_back_pl: '所有歌单',
+      pl_detail_songs: '歌单内容',
+      btn_add_to_pl_picker: '从音乐库添加歌曲',
+      settings_eyebrow: 'MUSIKKU · 设置',
+      settings_title: '设置',
+      settings_badge: '偏好与系统',
+      settings_theme_title: '主题与外观',
+      settings_theme_desc: '选择最适合您双眼的视觉风格',
+      settings_lang_title: '应用语言',
+      settings_lang_desc: '选择 MusikKu 的界面显示语言',
+      settings_audio_title: '播放与音频',
+      settings_audio_desc: '控制睡眠定时器与音乐播放行为',
+      settings_timer_title: '睡眠定时器',
+      settings_timer_sub: '时间结束时自动暂停音乐 · 未启用',
+      settings_timer_off: '关闭',
+      settings_autoplay_title: '自动播放下一首',
+      settings_autoplay_sub: '当前歌曲播放完毕后自动继续播放队列',
+      settings_quality_title: '在线流媒体音质',
+      settings_quality_sub: '在最佳音质与流量节省之间取得平衡',
+      quality_high: '高音质 (256 - 320 kbps)',
+      quality_std: '标准 (160 kbps)',
+      quality_low: '省流量 (96 kbps)',
+      settings_folders_title: '音乐文件夹与存储',
+      settings_folders_desc: '用于扫描本地音乐文件的电脑文件夹路径',
+      btn_settings_add_folder: '添加文件夹',
+      btn_settings_rescan: '重新扫描曲库',
+      btn_settings_open_dl: '打开下载文件夹',
+      settings_shortcuts_title: '键盘快捷键',
+      settings_shortcuts_desc: '无需鼠标快速操控音乐播放',
+      shortcut_play_pause: '播放 / 暂停音乐',
+      shortcut_next: '下一首歌曲',
+      shortcut_prev: '上一首歌曲',
+      shortcut_vol: '音量加 / 减',
+      shortcut_mute: '静音 / 取消静音',
+      shortcut_fav: '收藏当前歌曲',
+      shortcut_repeat: '切换循环模式',
+      settings_data_title: '数据与清理',
+      settings_data_desc: '管理本地缓存和应用搜索历史',
+      settings_clear_searches_title: '搜索历史',
+      settings_clear_searches_sub: '清除本地与在线的所有搜索历史记录',
+      btn_settings_clear_history: '清除历史',
+      settings_reset_title: '重置设置',
+      settings_reset_sub: '将外观主题和播放偏好恢复为出厂默认设置',
+      btn_settings_reset: '重置设置',
+      about_app_desc: '融合磨砂玻璃态与黑胶旋转表盘的现代音乐播放器。支持离线播放、在线流媒体、实时歌词与直接下载。',
+      np_close: '关闭播放器',
+      change_photo: '更换封面',
+      np_playing_eyebrow: '正在播放',
+      np_tab_queue: '播放队列',
+      np_tab_lyrics: '歌词',
+      np_lrc_loading: '正在从 LRCLIB 加载歌词...',
+      np_lrc_empty: '此歌曲暂无歌词',
+      np_lrc_hint: '点击歌词行可跳转至对应时间点。',
+      np_lrc_follow: '随歌滚动',
+      np_queue_now: '正在播放',
+      np_save_queue_pl: '将队列保存为歌单',
+      np_clear_queue: '清空播放队列',
+      dl_modal_title: '音乐下载工具',
+      dl_modal_sub: '直接从 URL 下载音频文件',
+      dl_modal_url_label: '音频文件链接 (MP3 / 直链流) *',
+      dl_modal_title_label: '歌曲标题',
+      dl_modal_artist_label: '歌手名称',
+      btn_cancel: '取消',
+      btn_start_dl: '开始下载',
+      pl_modal_title: '新建歌单',
+      pl_modal_sub: '整理您喜爱的歌曲',
+      pl_modal_name_label: '歌单名称',
+      pl_modal_cover_label: '封面渐变色',
+      btn_save_pl: '保存歌单',
+      toast_lang_changed: '已切换语言至 中文'
+    },
+    pt: {
+      nav_space: 'SEU ESPAÇO DE MÚSICA',
+      nav_library: 'Biblioteca',
+      nav_online: 'Explorar online',
+      nav_favorites: 'Favoritos',
+      nav_downloads: 'Downloads',
+      nav_playlists: 'Playlists',
+      nav_settings: 'Configurações',
+      btn_add_folder: 'Adicionar pasta',
+      btn_dl_url: 'Baixar por URL',
+      tagline: 'Sua música. Seu espaço.',
+      lib_eyebrow: 'MUSIKKU · BIBLIOTECA',
+      lib_search_placeholder: 'Buscar músicas, artistas, álbuns...',
+      recent_searches: 'Buscas Recentes',
+      clear_all: 'Limpar Tudo',
+      popular_suggestions: 'Sugestões Populares',
+      now_playing_eyebrow: 'TOCANDO AGORA',
+      now_playing_empty: 'Escolha uma música da biblioteca ou explore',
+      collection_title: 'Coleção',
+      play_all: 'Tocar tudo',
+      quick_add_folder_title: 'Adicionar pasta',
+      quick_add_folder_sub: 'Escanear músicas do seu computador',
+      quick_dl_title: 'Baixar por URL',
+      quick_dl_sub: 'Cole o link, salve offline',
+      empty_lib_title: 'Biblioteca Vazia',
+      empty_lib_desc: 'Adicione pastas de música do computador para começar a ouvir.',
+      explore_eyebrow: 'TRANSMISSÃO DE MILHÕES DE MÚSICAS ONLINE',
+      explore_heading: 'Explorar',
+      explore_search_placeholder: 'Buscar músicas online (SZA, Daniel Caesar, pop, etc)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (Sem Royalties)',
+      tuner_eyebrow: 'SELETOR DE GÊNEROS',
+      active_channel: 'Canal ativo:',
+      empty_search_title: 'Comece a Buscar Músicas',
+      empty_search_desc: 'Digite título, artista ou gire o seletor para encontrar músicas incríveis.',
+      load_more: 'Carregar Mais Músicas',
+      fav_eyebrow: 'SEUS FAVORITOS',
+      fav_title: 'Favoritos',
+      fav_search_placeholder: 'Buscar nos favoritos...',
+      empty_fav_eyebrow: 'DISCO VAZIO',
+      empty_fav_title: 'Nenhuma música<br />favorita ainda',
+      empty_fav_desc: 'Clique no ícone de coração em qualquer música para adicioná-la aos favoritos.',
+      btn_fav_explore: 'Explorar música online',
+      btn_fav_lib: 'Abrir biblioteca',
+      dl_breadcrumb: 'Biblioteca / Downloads',
+      dl_search_placeholder: 'Buscar nos downloads...',
+      dl_tag: 'DISPONÍVEL OFFLINE',
+      dl_hero_heading: 'Música favorita.<br>Sem limites de sinal.',
+      dl_hero_sub: 'Todas as suas músicas baixadas em um só lugar. Prontas para ouvir a qualquer hora.',
+      dl_card_title: 'Músicas baixadas',
+      dl_open_folder: 'Abrir pasta',
+      sort_recent: 'Mais recentes',
+      sort_title: 'Título (A–Z)',
+      sort_duration: 'Duração',
+      sort_name: 'Nome A–Z',
+      dl_th_title: 'TÍTULO DA MÚSICA',
+      dl_th_source: 'FONTE',
+      dl_th_dur: 'DURAÇÃO',
+      dl_empty_title: 'Nenhuma música baixada',
+      dl_empty_desc: 'Baixe músicas na aba "Explorar" ou use o botão de link para salvar offline.',
+      dl_footer_note: 'Salvo no seu dispositivo. Curta música sem conexão com a internet.',
+      pl_eyebrow: 'LISTAS DE REPRODUÇÃO',
+      pl_title: 'Playlists',
+      pl_search_placeholder: 'Buscar playlists...',
+      btn_new_pl: 'Nova playlist',
+      btn_back_pl: 'Todas as playlists',
+      pl_detail_songs: 'Conteúdo da playlist',
+      btn_add_to_pl_picker: 'Adicionar música da biblioteca',
+      settings_eyebrow: 'MUSIKKU · CONFIGURAÇÕES',
+      settings_title: 'Configurações',
+      settings_badge: 'Preferências & Sistema',
+      settings_theme_title: 'Tema & Visual',
+      settings_theme_desc: 'Escolha o estilo visual mais confortável para seus olhos',
+      settings_lang_title: 'Idioma do Aplicativo',
+      settings_lang_desc: 'Escolha o idioma de exibição do MusikKu',
+      settings_audio_title: 'Reprodução & Áudio',
+      settings_audio_desc: 'Controle o timer de suspensão e fluxo de reprodução',
+      settings_timer_title: 'Timer de Suspensão (Sleep Timer)',
+      settings_timer_sub: 'Pausa a música automaticamente quando o tempo acaba · Inativo',
+      settings_timer_off: 'Desativado',
+      settings_autoplay_title: 'Tocar Próxima Automaticamente',
+      settings_autoplay_sub: 'Continuar com a próxima música da fila quando a atual terminar',
+      settings_quality_title: 'Qualidade de Streaming Online',
+      settings_quality_sub: 'Escolha entre melhor fidelidade sonora e economia de dados',
+      quality_high: 'Alta (256 - 320 kbps)',
+      quality_std: 'Padrão (160 kbps)',
+      quality_low: 'Econômica (96 kbps)',
+      settings_folders_title: 'Pastas & Armazenamento',
+      settings_folders_desc: 'Pastas no seu computador verificadas para arquivos de áudio locais',
+      btn_settings_add_folder: 'Adicionar Pasta',
+      btn_settings_rescan: 'Reescanear Coleção',
+      btn_settings_open_dl: 'Abrir Pasta de Downloads',
+      settings_shortcuts_title: 'Atalhos de Teclado',
+      settings_shortcuts_desc: 'Controle a música rapidamente sem usar o mouse',
+      shortcut_play_pause: 'Reproduzir / Pausar',
+      shortcut_next: 'Próxima música',
+      shortcut_prev: 'Música anterior',
+      shortcut_vol: 'Aumentar / Diminuir Volume',
+      shortcut_mute: 'Silenciar som (Mudo)',
+      shortcut_fav: 'Favoritar música atual',
+      shortcut_repeat: 'Alternar modo de repetição',
+      settings_data_title: 'Dados & Limpeza',
+      settings_data_desc: 'Gerencie o cache local e histórico de busca',
+      settings_clear_searches_title: 'Histórico de Busca',
+      settings_clear_searches_sub: 'Limpar histórico de buscas locais e online',
+      btn_settings_clear_history: 'Limpar Histórico',
+      settings_reset_title: 'Redefinir Configurações',
+      settings_reset_sub: 'Restaurar temas e preferências aos padrões de fábrica',
+      btn_settings_reset: 'Redefinir Ajustes',
+      about_app_desc: 'Player de música moderno com estética frosted glassmorphism & dial de vinil. Suporta reprodução offline, streaming online, letras sincronizadas e download direto.',
+      np_close: 'Fechar player',
+      change_photo: 'Trocar Foto',
+      np_playing_eyebrow: 'TOCANDO AGORA',
+      np_tab_queue: 'Fila',
+      np_tab_lyrics: 'Letra',
+      np_lrc_loading: 'Carregando letra do LRCLIB...',
+      np_lrc_empty: 'Letra indisponível para esta música',
+      np_lrc_hint: 'Clique em um verso para avançar a reprodução.',
+      np_lrc_follow: 'Rolar automático',
+      np_queue_now: 'TOCANDO AGORA',
+      np_save_queue_pl: 'Salvar fila como playlist',
+      np_clear_queue: 'Esvaziar fila',
+      dl_modal_title: 'Ferramenta de Download',
+      dl_modal_sub: 'Baixar arquivo de áudio direto de um link',
+      dl_modal_url_label: 'URL do Áudio (MP3 / Stream Direto) *',
+      dl_modal_title_label: 'Título da Música',
+      dl_modal_artist_label: 'Nome do Artista',
+      btn_cancel: 'Cancelar',
+      btn_start_dl: 'Iniciar Download',
+      pl_modal_title: 'Nova Playlist',
+      pl_modal_sub: 'Agrupe suas músicas favoritas',
+      pl_modal_name_label: 'Nome da Playlist',
+      pl_modal_cover_label: 'Cor da Capa',
+      btn_save_pl: 'Salvar Playlist',
+      toast_lang_changed: 'Idioma alterado para Português'
+    },
+    ru: {
+      nav_space: 'ВАШЕ МУЗЫКАЛЬНОЕ ПРОСТРАНСТВО',
+      nav_library: 'Библиотека',
+      nav_online: 'Онлайн-поиск',
+      nav_favorites: 'Избранное',
+      nav_downloads: 'Загрузки',
+      nav_playlists: 'Плейлисты',
+      nav_settings: 'Настройки',
+      btn_add_folder: 'Добавить папку',
+      btn_dl_url: 'Скачать по ссылке',
+      tagline: 'Твоя музыка. Твое пространство.',
+      lib_eyebrow: 'MUSIKKU · БИБЛИОТЕКА',
+      lib_search_placeholder: 'Поиск треков, артистов, альбомов...',
+      recent_searches: 'История поиска',
+      clear_all: 'Очистить всё',
+      popular_suggestions: 'Популярные запросы',
+      now_playing_eyebrow: 'СЕЙЧАС ИГРАЕТ',
+      now_playing_empty: 'Выберите трек из библиотеки или поиска',
+      collection_title: 'Коллекция',
+      play_all: 'Воспроизвести всё',
+      quick_add_folder_title: 'Добавить папку',
+      quick_add_folder_sub: 'Сканировать музыку с вашего компьютера',
+      quick_dl_title: 'Скачать по ссылке',
+      quick_dl_sub: 'Вставьте ссылку и сохраните офлайн',
+      empty_lib_title: 'Библиотека пуста',
+      empty_lib_desc: 'Добавьте папки с музыкой на компьютере, чтобы начать прослушивание.',
+      explore_eyebrow: 'МИЛЛИОНЫ ТРЕКОВ ОНЛАЙН',
+      explore_heading: 'Обзор',
+      explore_search_placeholder: 'Поиск музыки онлайн (SZA, Daniel Caesar, рок, поп)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (Без лицензий)',
+      tuner_eyebrow: 'ПЕРЕКЛЮЧАТЕЛЬ ЖАНРОВ',
+      active_channel: 'Активный канал:',
+      empty_search_title: 'Начните поиск музыки',
+      empty_search_desc: 'Введите название трека или артиста сверху, либо поверните переключатель жанров.',
+      load_more: 'Загрузить больше треков',
+      fav_eyebrow: 'ВАШЕ ИЗБРАННОЕ',
+      fav_title: 'Избранное',
+      fav_search_placeholder: 'Поиск в избранном...',
+      empty_fav_eyebrow: 'ПУСТОЙ ВИНИЛ',
+      empty_fav_title: 'В избранном пока<br />нет треков',
+      empty_fav_desc: 'Нажмите на иконку сердечка у любого трека, чтобы добавить его в избранное.',
+      btn_fav_explore: 'Искать музыку онлайн',
+      btn_fav_lib: 'Открыть библиотеку',
+      dl_breadcrumb: 'Библиотека / Загрузки',
+      dl_search_placeholder: 'Поиск среди загруженных треков...',
+      dl_tag: 'ДОСТУПНО ОФЛАЙН',
+      dl_hero_heading: 'Любимая музыка.<br>Вне зависимости от сети.',
+      dl_hero_sub: 'Все скачанные треки в одном месте. Слушайте где и когда угодно.',
+      dl_card_title: 'Загруженные треки',
+      dl_open_folder: 'Открыть папку',
+      sort_recent: 'Сначала новые',
+      sort_title: 'Название (А–Я)',
+      sort_duration: 'Длительность',
+      sort_name: 'Название А–Я',
+      dl_th_title: 'НАЗВАНИЕ ТРЕКА',
+      dl_th_source: 'ИСТОЧНИК',
+      dl_th_dur: 'ДЛИТЕЛЬНОСТЬ',
+      dl_empty_title: 'Нет загруженных треков',
+      dl_empty_desc: 'Скачивайте треки из вкладки «Обзор» или используйте ссылку в боковом меню.',
+      dl_footer_note: 'Сохранено на вашем устройстве. Наслаждайтесь музыкой без интернета.',
+      pl_eyebrow: 'СПИСКИ ВОСПРОИЗВЕДЕНИЯ',
+      pl_title: 'Плейлисты',
+      pl_search_placeholder: 'Поиск плейлистов...',
+      btn_new_pl: 'Новый плейлист',
+      btn_back_pl: 'Все плейлисты',
+      pl_detail_songs: 'Треки в плейлисте',
+      btn_add_to_pl_picker: 'Добавить трек из библиотеки',
+      settings_eyebrow: 'MUSIKKU · НАСТРОЙКИ',
+      settings_title: 'Настройки',
+      settings_badge: 'Предпочтения и система',
+      settings_theme_title: 'Тема и оформление',
+      settings_theme_desc: 'Выберите комфортный визуальный стиль для ваших глаз',
+      settings_lang_title: 'Язык приложения',
+      settings_lang_desc: 'Выберите язык интерфейса MusikKu',
+      settings_audio_title: 'Воспроизведение и звук',
+      settings_audio_desc: 'Таймер сна и параметры непрерывного воспроизведения',
+      settings_timer_title: 'Таймер сна (Sleep Timer)',
+      settings_timer_sub: 'Автоматически ставит музыку на паузу по таймеру · Отключен',
+      settings_timer_off: 'Выкл',
+      settings_autoplay_title: 'Автовоспроизведение следующего трека',
+      settings_autoplay_sub: 'Продолжать воспроизведение очереди после завершения текущего трека',
+      settings_quality_title: 'Качество онлайн-потока',
+      settings_quality_sub: 'Баланс между наилучшим звучанием и экономией трафика',
+      quality_high: 'Высокое (256 - 320 кбит/с)',
+      quality_std: 'Стандартное (160 кбит/с)',
+      quality_low: 'Экономия трафика (96 кбит/с)',
+      settings_folders_title: 'Папки и хранилище музыки',
+      settings_folders_desc: 'Папки на компьютере, сканируемые для поиска локальной музыки',
+      btn_settings_add_folder: 'Добавить папку',
+      btn_settings_rescan: 'Пересканировать коллекцию',
+      btn_settings_open_dl: 'Открыть папку загрузок',
+      settings_shortcuts_title: 'Горячие клавиши',
+      settings_shortcuts_desc: 'Управляйте музыкой мгновенно без мыши',
+      shortcut_play_pause: 'Воспроизведение / Пауза',
+      shortcut_next: 'Следующий трек',
+      shortcut_prev: 'Предыдущий трек',
+      shortcut_vol: 'Громкость Выше / Ниже',
+      shortcut_mute: 'Отключить / Включить звук',
+      shortcut_fav: 'Добавить/Убрать из избранного',
+      shortcut_repeat: 'Переключить режим повтора',
+      settings_data_title: 'Данные и очистка',
+      settings_data_desc: 'Управление локальным кэшем и историей поиска',
+      settings_clear_searches_title: 'История поиска',
+      settings_clear_searches_sub: 'Очистить историю запросов в библиотеке и онлайн',
+      btn_settings_clear_history: 'Очистить историю',
+      settings_reset_title: 'Сброс настроек',
+      settings_reset_sub: 'Сбросить тему оформления и параметры плеера до заводских',
+      btn_settings_reset: 'Сбросить настройки',
+      about_app_desc: 'Современный плеер в стиле frosted glassmorphism с вращающимся виниловым диском. Поддерживает офлайн треки, онлайн стриминг, синхронизированные тексты и скачивание.',
+      np_close: 'Закрыть плеер',
+      change_photo: 'Сменить фото',
+      np_playing_eyebrow: 'СЕЙЧАС ИГРАЕТ',
+      np_tab_queue: 'Очередь',
+      np_tab_lyrics: 'Текст песни',
+      np_lrc_loading: 'Загрузка текста из LRCLIB...',
+      np_lrc_empty: 'Для этого трека текст пока недоступен',
+      np_lrc_hint: 'Нажмите на строку текста, чтобы перейти к этому моменту.',
+      np_lrc_follow: 'Следить за треком',
+      np_queue_now: 'СЕЙЧАС ИГРАЕТ',
+      np_save_queue_pl: 'Сохранить очередь в плейлист',
+      np_clear_queue: 'Очистить очередь',
+      dl_modal_title: 'Инструмент загрузки',
+      dl_modal_sub: 'Скачать аудиофайл напрямую по ссылке',
+      dl_modal_url_label: 'Ссылка на аудио (MP3 / Direct Stream) *',
+      dl_modal_title_label: 'Название трека',
+      dl_modal_artist_label: 'Имя исполнителя',
+      btn_cancel: 'Отмена',
+      btn_start_dl: 'Начать загрузку',
+      pl_modal_title: 'Новый плейлист',
+      pl_modal_sub: 'Сгруппируйте любимые композиции',
+      pl_modal_name_label: 'Название плейлиста',
+      pl_modal_cover_label: 'Цвет обложки',
+      btn_save_pl: 'Сохранить плейлист',
+      toast_lang_changed: 'Язык переключен на Русский'
+    }
+  };
+
+  function applyLanguage(lang) {
+    state.language = lang || 'id';
+    localStorage.setItem('musikku_desktop_language', state.language);
+    const dict = TRANSLATIONS[state.language] || TRANSLATIONS.id;
+
+    // Update all text elements with data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      if (dict[key] !== undefined) {
+        if (dict[key].includes('<')) {
+          el.innerHTML = dict[key];
+        } else {
+          el.textContent = dict[key];
+        }
+      }
+    });
+
+    // Update all placeholder elements with data-i18n-placeholder
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.dataset.i18nPlaceholder;
+      if (dict[key] !== undefined) {
+        el.placeholder = dict[key];
+      }
+    });
+
+    // Update all title elements with data-i18n-title
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const key = el.dataset.i18nTitle;
+      if (dict[key] !== undefined) {
+        el.title = dict[key];
+      }
+    });
+
+    updateLanguageCardsUI();
+  }
+
+  function updateLanguageCardsUI() {
+    const cards = document.querySelectorAll('.lang-option-card');
+    cards.forEach(card => {
+      const l = card.dataset.lang;
+      card.classList.toggle('active', l === state.language);
+    });
+  }
+
+  function startSleepTimer(minutes) {
+    if (state.sleepTimerInterval) {
+      clearInterval(state.sleepTimerInterval);
+      state.sleepTimerInterval = null;
+    }
+
+    state.sleepTimerMinutes = minutes;
+    if (minutes <= 0) {
+      state.sleepTimerRemaining = 0;
+      updateSleepTimerUI();
+      showDownloadToast('Sleep Timer dinonaktifkan', 0);
+      hideDownloadToast(1500);
+      return;
+    }
+
+    state.sleepTimerRemaining = minutes * 60;
+    updateSleepTimerUI();
+    showDownloadToast(`Sleep Timer aktif: ${minutes} menit`, 100);
+    hideDownloadToast(2000);
+
+    state.sleepTimerInterval = setInterval(() => {
+      state.sleepTimerRemaining -= 1;
+      updateSleepTimerUI();
+
+      if (state.sleepTimerRemaining <= 0) {
+        clearInterval(state.sleepTimerInterval);
+        state.sleepTimerInterval = null;
+        state.sleepTimerMinutes = 0;
+        if (state.isPlaying) {
+          audio.pause();
+          state.isPlaying = false;
+          updatePlayerUI();
+          renderCurrentScreenTracks();
+        }
+        showDownloadToast('Waktu tidur habis: Pemutaran musik dijeda', 0);
+        hideDownloadToast(3500);
+        updateSleepTimerUI();
+      }
+    }, 1000);
+  }
+
+  function updateSleepTimerUI() {
+    const pills = document.querySelectorAll('.btn-timer-pill');
+    pills.forEach(p => {
+      const m = parseInt(p.dataset.mins || '0', 10);
+      p.classList.toggle('active', m === state.sleepTimerMinutes);
+    });
+
+    const statusEl = document.getElementById('sleep-timer-status-text');
+    if (statusEl) {
+      if (state.sleepTimerRemaining > 0) {
+        const mins = Math.floor(state.sleepTimerRemaining / 60);
+        const secs = state.sleepTimerRemaining % 60;
+        const formatted = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        statusEl.textContent = `Musik akan dijeda otomatis dalam ${formatted}`;
+        statusEl.style.color = 'var(--accent)';
+      } else {
+        statusEl.textContent = 'Otomatis menjeda musik saat waktu habis · Tidak aktif';
+        statusEl.style.color = '';
+      }
+    }
+  }
+
+  function renderSettingsFolders() {
+    const container = document.getElementById('settings-folder-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.scannedFolders || state.scannedFolders.length === 0) {
+      container.innerHTML = `
+        <div class="settings-folder-empty">
+          <span class="material-icons-round">folder_off</span>
+          <span>Belum ada folder kustom yang ditambahkan</span>
+        </div>
+      `;
+      return;
+    }
+
+    state.scannedFolders.forEach((folderPath, index) => {
+      const row = document.createElement('div');
+      row.className = 'settings-folder-row';
+      row.innerHTML = `
+        <div class="settings-folder-info">
+          <span class="material-icons-round folder-icon">folder</span>
+          <span class="folder-path" title="${folderPath}">${folderPath}</span>
+        </div>
+        <button type="button" class="btn-remove-folder" data-index="${index}" title="Hapus folder dari daftar perpustakaan">
+          <span class="material-icons-round">delete_outline</span>
+        </button>
+      `;
+
+      row.querySelector('.btn-remove-folder')?.addEventListener('click', async () => {
+        const confirmed = await showConfirmModal({
+          title: 'Hapus Folder?',
+          subtitle: 'Folder akan dikeluarkan dari daftar perpustakaan',
+          message: `Folder:<br><code style="font-size:12px;word-break:break-all;">${folderPath}</code><br><br>File musik asli di komputermu <strong>tetap aman dan tidak akan terhapus</strong>.`,
+          confirmText: 'Hapus Folder',
+          cancelText: 'Batal',
+          icon: 'folder_delete',
+          isDanger: true
+        });
+
+        if (confirmed) {
+          state.scannedFolders.splice(index, 1);
+          saveFolders();
+          renderSettingsFolders();
+          // Rescan sisa folder
+          state.allSongs = [];
+          for (const f of state.scannedFolders) {
+            const songs = await scanFolder(f);
+            mergeSongs(songs);
+          }
+          applyFilterAndRenderLibrary();
+          showDownloadToast('Folder berhasil dihapus dari perpustakaan', 0);
+          hideDownloadToast(2000);
+        }
+      });
+
+      container.appendChild(row);
+    });
+  }
+
+  async function rescanAllFolders() {
+    showDownloadToast('Memindai ulang seluruh folder musik...', 40);
+    state.allSongs = [];
+    if (state.scannedFolders.length > 0) {
+      for (const folder of state.scannedFolders) {
+        const songs = await scanFolder(folder);
+        mergeSongs(songs);
+      }
+    }
+    try {
+      const dlFolder = await window.elektronAPI?.getDownloadsFolder();
+      if (dlFolder) {
+        const dlFiles = await scanFolder(dlFolder);
+        if (dlFiles.length > 0) {
+          state.downloadedSongs = dlFiles.map(f => ({ ...f, isDownloaded: true }));
+          saveDownloads();
+          mergeSongs(dlFiles);
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal memindai folder unduhan:', e);
+    }
+
+    applyFilterAndRenderLibrary();
+    renderSettingsFolders();
+    showDownloadToast(`Pemindaian selesai: ${state.allSongs.length} lagu ditemukan`, 100);
+    hideDownloadToast(2500);
+  }
+
+  function renderSettingsView() {
+    updateThemeCardsUI();
+    updateLanguageCardsUI();
+    updateSleepTimerUI();
+    renderSettingsFolders();
+
+    const autoplayToggle = document.getElementById('setting-autoplay');
+    if (autoplayToggle) {
+      autoplayToggle.checked = state.autoPlayNext !== false;
+    }
+
+    const qualitySelect = document.getElementById('setting-audio-quality');
+    if (qualitySelect) {
+      qualitySelect.value = state.audioQuality || 'standard';
+    }
+  }
+
+  function setupSettingsEventListeners() {
+    // Theme cards
+    const themeCards = document.querySelectorAll('.theme-option-card');
+    themeCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const theme = card.dataset.theme;
+        if (theme) {
+          applyTheme(theme);
+          const themeNames = {
+            light: 'Light Sky Blue',
+            emerald: 'Dark Emerald',
+            dark: 'Midnight Obsidian'
+          };
+          showDownloadToast(`Tema diubah ke ${themeNames[theme] || theme}`, 100);
+          hideDownloadToast(1800);
+        }
+      });
+    });
+
+    // Language cards
+    const langCards = document.querySelectorAll('.lang-option-card');
+    langCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const lang = card.dataset.lang;
+        if (lang) {
+          applyLanguage(lang);
+          const langNames = {
+            id: 'Bahasa Indonesia',
+            en: 'English',
+            zh: 'Mandarin (中文)',
+            pt: 'Português',
+            ru: 'Русский'
+          };
+          const msg = TRANSLATIONS[lang]?.toast_lang_changed || `Bahasa diubah ke ${langNames[lang] || lang}`;
+          showDownloadToast(msg, 100);
+          hideDownloadToast(1800);
+        }
+      });
+    });
+
+    // Sleep timer pills
+    const timerPills = document.querySelectorAll('.btn-timer-pill');
+    timerPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        const mins = parseInt(pill.dataset.mins || '0', 10);
+        startSleepTimer(mins);
+      });
+    });
+
+    // Autoplay toggle
+    const autoplayToggle = document.getElementById('setting-autoplay');
+    autoplayToggle?.addEventListener('change', (e) => {
+      state.autoPlayNext = e.target.checked;
+      localStorage.setItem('musikku_autoplay', e.target.checked ? 'true' : 'false');
+      showDownloadToast(state.autoPlayNext ? 'Putar otomatis berikutnya aktif' : 'Putar otomatis dinonaktifkan', 100);
+      hideDownloadToast(1800);
+    });
+
+    // Audio quality select
+    const qualitySelect = document.getElementById('setting-audio-quality');
+    qualitySelect?.addEventListener('change', (e) => {
+      state.audioQuality = e.target.value;
+      localStorage.setItem('musikku_audio_quality', e.target.value);
+      showDownloadToast(`Kualitas streaming disetel: ${e.target.options[e.target.selectedIndex].text}`, 100);
+      hideDownloadToast(2000);
+    });
+
+    // Add folder button in settings
+    document.getElementById('btn-settings-add-folder')?.addEventListener('click', async () => {
+      await addFolder();
+      renderSettingsFolders();
+    });
+
+    // Rescan collection
+    document.getElementById('btn-settings-rescan')?.addEventListener('click', rescanAllFolders);
+
+    // Open downloads folder
+    document.getElementById('btn-settings-open-downloads')?.addEventListener('click', () => {
+      window.elektronAPI?.openDownloadsFolder();
+    });
+
+    // Clear search history
+    document.getElementById('btn-settings-clear-searches')?.addEventListener('click', async () => {
+      const confirmed = await showConfirmModal({
+        title: 'Hapus Riwayat Pencarian?',
+        subtitle: 'Seluruh saran pencarian akan dibersihkan',
+        message: 'Apakah kamu yakin ingin menghapus seluruh riwayat kata kunci pencarian di perpustakaan dan online?',
+        confirmText: 'Hapus Riwayat',
+        cancelText: 'Batal',
+        icon: 'delete_sweep',
+        isDanger: true
+      });
+
+      if (confirmed) {
+        clearRecentSearches('lib');
+        clearRecentSearches('online');
+        renderRecentSearchPopover('lib');
+        renderRecentSearchPopover('online');
+        showDownloadToast('Riwayat pencarian berhasil dibersihkan', 100);
+        hideDownloadToast(2000);
+      }
+    });
+
+    // Reset settings
+    document.getElementById('btn-settings-reset-all')?.addEventListener('click', async () => {
+      const confirmed = await showConfirmModal({
+        title: 'Reset Semua Pengaturan?',
+        subtitle: 'Kembalikan preferensi ke setelan pabrik',
+        message: 'Tema tampilan, sleep timer, putar otomatis, dan kualitas streaming akan dikembalikan ke setelan awal. Lagu dan playlist Anda tetap aman.',
+        confirmText: 'Reset Pengaturan',
+        cancelText: 'Batal',
+        icon: 'restart_alt',
+        isDanger: true
+      });
+
+      if (confirmed) {
+        applyTheme('light');
+        applyLanguage('id');
+        state.autoPlayNext = true;
+        localStorage.setItem('musikku_autoplay', 'true');
+        state.audioQuality = 'standard';
+        localStorage.setItem('musikku_audio_quality', 'standard');
+        startSleepTimer(0);
+        renderSettingsView();
+        showDownloadToast('Pengaturan telah direset ke setelan awal', 100);
+        hideDownloadToast(2500);
+      }
+    });
+  }
+
   // ─── App Initialization ────────────────────────────────────────────────────
   async function init() {
+    applyTheme(state.theme);
+    applyLanguage(state.language);
+    setupSettingsEventListeners();
     migratePlaylistsIfNeeded();
     renderTunerStops();
 

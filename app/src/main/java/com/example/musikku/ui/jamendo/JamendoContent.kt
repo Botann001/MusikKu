@@ -48,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,16 @@ fun JamendoContent(
     val focusManager = LocalFocusManager.current
     val genreChips = listOf("Populer", "Pop", "Lo-fi", "Elektronik", "Akustik", "Rock", "Jazz", "Chill")
     var selectedGenre by remember { mutableStateOf("Populer") }
+
+    // Sinkronisasi otomatis saat query di-reset dari luar (misal kembali ke tab Jelajah)
+    LaunchedEffect(state.query) {
+        if (searchInput != state.query) {
+            searchInput = state.query
+        }
+        if (state.query.isBlank()) {
+            selectedGenre = "Populer"
+        }
+    }
 
     val displayList = if (state.query.isNotBlank()) state.results else state.popularTracks
     val sectionTitle = if (searchInput.isNotBlank()) "Hasil pencarian" else "Sedang populer"

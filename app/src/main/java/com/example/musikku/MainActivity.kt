@@ -15,17 +15,21 @@ import com.example.musikku.ui.library.LibraryViewModel
 import com.example.musikku.ui.theme.MusikKuTheme
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.musikku.data.preferences.AppLanguage
@@ -39,11 +43,44 @@ import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
 
+    private var mainViewModel: LibraryViewModel? = null
+    private var customResources: android.content.res.Resources? = null
+
+    fun updateCustomConfiguration(config: Configuration) {
+        try {
+            customResources = createConfigurationContext(config).resources
+        } catch (_: Exception) {}
+    }
+
+    override fun getResources(): android.content.res.Resources {
+        return customResources ?: super.getResources()
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleSpotifyIntent(intent)
+    }
+
+    private fun handleSpotifyIntent(intent: android.content.Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "musikku" && uri.host == "spotify-callback") {
+            val code = uri.getQueryParameter("code")
+            if (!code.isNullOrBlank()) {
+                mainViewModel?.handleSpotifyAuthCallback(code)
+            }
+        }
+    }
+
     override fun attachBaseContext(newBase: Context) {
         val language = runBlocking {
             SettingsRepository(newBase).appLanguage.first()
         }
-        super.attachBaseContext(LocaleHelper.applyLocale(newBase, language))
+        val localizedContext = LocaleHelper.createLocalizedContext(newBase, language)
+        val config = Configuration(localizedContext.resources.configuration)
+        try {
+            applyOverrideConfiguration(config)
+        } catch (_: Exception) {}
+        super.attachBaseContext(localizedContext)
     }
 
     /**
@@ -118,18 +155,26 @@ class MainActivity : ComponentActivity() {
             }
 
             val appLanguage by appContainer.settingsRepository.appLanguage
-                .collectAsStateWithLifecycle(initialValue = null)
+                .collectAsStateWithLifecycle(initialValue = AppLanguage.SYSTEM)
 
-            var initialLanguage by remember { mutableStateOf<AppLanguage?>(null) }
-
+            // Terapkan ke Android 13+ LocaleManager & context resources saat bahasa dipilih
             LaunchedEffect(appLanguage) {
-                if (appLanguage != null) {
-                    if (initialLanguage == null) {
-                        initialLanguage = appLanguage
-                    } else if (initialLanguage != appLanguage) {
-                        recreate()
-                    }
+                LocaleHelper.applyLocaleToSystem(this@MainActivity, appLanguage)
+            }
+
+            val targetLocale = remember(appLanguage) {
+                LocaleHelper.resolveLocale(appLanguage)
+            }
+            val baseConfig = LocalConfiguration.current
+            val localizedConfig = remember(baseConfig, targetLocale) {
+                Configuration(baseConfig).apply {
+                    setLocale(targetLocale)
+                    setLayoutDirection(targetLocale)
                 }
+            }
+            DisposableEffect(localizedConfig) {
+                updateCustomConfiguration(localizedConfig)
+                onDispose {}
             }
 
             val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -141,30 +186,42 @@ class MainActivity : ComponentActivity() {
                 focusManager.clearFocus(force = true)
             }
 
-            MusikKuTheme(themeMode = themeMode) {
-                val viewModel: LibraryViewModel = viewModel(
-                    factory = LibraryViewModel.Factory(
-                        repository = appContainer.musicRepository,
-                        jamendoRepository = appContainer.jamendoRepository,
-                        youTubeMusicRepository = appContainer.youTubeMusicRepository,
-                        lyricsRepository = appContainer.lyricsRepository,
-                        settingsRepository = appContainer.settingsRepository,
-                        networkMonitor = appContainer.networkMonitor,
-                        musicController = appContainer.musicController
-                    )
-                )
-
-                Box(modifier = Modifier.fillMaxSize()) {
-                    LibraryScreen(viewModel = viewModel)
-
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showSplash,
-                        enter = androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.fadeOut(
-                            animationSpec = androidx.compose.animation.core.tween(500)
+            CompositionLocalProvider(
+                LocalConfiguration provides localizedConfig,
+                androidx.activity.compose.LocalActivityResultRegistryOwner provides this@MainActivity
+            ) {
+                MusikKuTheme(themeMode = themeMode) {
+                    val viewModel: LibraryViewModel = viewModel(
+                        factory = LibraryViewModel.Factory(
+                            repository = appContainer.musicRepository,
+                            jamendoRepository = appContainer.jamendoRepository,
+                            youTubeMusicRepository = appContainer.youTubeMusicRepository,
+                            lyricsRepository = appContainer.lyricsRepository,
+                            settingsRepository = appContainer.settingsRepository,
+                            networkMonitor = appContainer.networkMonitor,
+                            musicController = appContainer.musicController,
+                            listeningStatsRepository = appContainer.listeningStatsRepository,
+                            spotifyRepository = appContainer.spotifyRepository
                         )
-                    ) {
-                        SplashScreen()
+                    )
+
+                    LaunchedEffect(viewModel) {
+                        mainViewModel = viewModel
+                        handleSpotifyIntent(intent)
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LibraryScreen(viewModel = viewModel)
+
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showSplash,
+                            enter = androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.fadeOut(
+                                animationSpec = androidx.compose.animation.core.tween(500)
+                            )
+                        ) {
+                            SplashScreen()
+                        }
                     }
                 }
             }

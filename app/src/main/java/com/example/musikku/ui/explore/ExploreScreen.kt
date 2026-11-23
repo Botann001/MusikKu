@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,6 +36,7 @@ import com.example.musikku.ui.jamendo.JamendoContent
 import com.example.musikku.ui.library.ExploreSourceTab
 import com.example.musikku.ui.library.JamendoSearchState
 import com.example.musikku.ui.library.YouTubeSearchState
+import com.example.musikku.ui.profile.UserProfileAvatar
 import com.example.musikku.ui.theme.ElectricLime
 import com.example.musikku.ui.theme.OnElectricLime
 import com.example.musikku.ui.theme.TextMuted
@@ -52,12 +54,16 @@ fun ExploreScreen(
     downloadOnlyWifi: Boolean,
     favoriteSongIds: Set<Long> = emptySet(),
     contentPadding: PaddingValues,
+    userName: String = "",
+    userAvatarUri: String = "",
+    onOpenProfile: () -> Unit = {},
     onYouTubeSearch: (String) -> Unit,
     onYouTubePlay: (YouTubeSearchItemDto) -> Unit,
     onYouTubeAddToQueue: (YouTubeSearchItemDto) -> Unit,
     onYouTubeAddToPlaylist: (YouTubeSearchItemDto) -> Unit,
     onYouTubeToggleFavorite: (YouTubeSearchItemDto) -> Unit = {},
     onYouTubeDownload: (YouTubeSearchItemDto) -> Unit = {},
+    onYouTubeLoadMore: () -> Unit = {},
     onJamendoSearch: (String) -> Unit,
     onJamendoStream: (JamendoTrackDto) -> Unit,
     onJamendoDownload: (JamendoTrackDto) -> Unit,
@@ -65,34 +71,54 @@ fun ExploreScreen(
     onToggleDownloadOnlyWifi: (Boolean) -> Unit,
     recentSearches: List<String> = emptyList(),
     onRemoveRecentSearch: (String) -> Unit = {},
-    onClearRecentSearches: () -> Unit = {}
+    onClearRecentSearches: () -> Unit = {},
+    onOpenSpotifyImportDialog: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // ─── Top Header: Subtitle, Title, Segmented Tabs ──────────────────────────
+        // ─── Top Header: Profil Avatar, Subtitle, Title, Segmented Tabs ────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 6.dp)
         ) {
-            Text(
-                text = if (currentTab == ExploreSourceTab.YOUTUBE) "STREAMING JUTAAN MUSIK ONLINE" else "MUSIK LEGAL BEBAS ROYALTI",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 1.6.sp
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = stringResource(R.string.nav_explore),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                fontSize = 32.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserProfileAvatar(
+                    userName = userName,
+                    avatarUri = userAvatarUri,
+                    size = 42.dp,
+                    onClick = onOpenProfile
+                )
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column {
+                    Text(
+                        text = if (currentTab == ExploreSourceTab.YOUTUBE)
+                            stringResource(R.string.explore_streaming_subtitle)
+                        else
+                            stringResource(R.string.explore_jamendo_subtitle),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.6.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.nav_explore),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 32.sp
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -172,7 +198,9 @@ fun ExploreScreen(
                             onAddToQueue = onYouTubeAddToQueue,
                             onAddToPlaylist = onYouTubeAddToPlaylist,
                             onToggleFavorite = onYouTubeToggleFavorite,
-                            onDownload = onYouTubeDownload
+                            onDownload = onYouTubeDownload,
+                            onLoadMore = onYouTubeLoadMore,
+                            onOpenSpotifyImportDialog = onOpenSpotifyImportDialog
                         )
                     }
 

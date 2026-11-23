@@ -4,8 +4,12 @@
     <string name="playback_channel_name">音乐播放</string>
 
     <!-- Navigation -->
-    <string name="nav_library">音乐库</string>
-    <string name="nav_explore">探索</string>
+    <string name="nav_beranda">首页</string>
+    <string name="nav_pustaka">音乐库</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_library">首页</string>
+    <string name="nav_explore">搜索</string>
     <string name="nav_settings">设置</string>
 
     <!-- Settings -->

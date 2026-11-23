@@ -4,8 +4,12 @@
     <string name="playback_channel_name">Music Playback</string>
 
     <!-- Navigation -->
+    <string name="nav_beranda">Home</string>
+    <string name="nav_pustaka">Library</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
     <string name="nav_library">Library</string>
-    <string name="nav_explore">Explore</string>
+    <string name="nav_explore">Search</string>
     <string name="nav_settings">Settings</string>
 
     <!-- Settings -->
@@ -55,4 +59,56 @@
     <string name="explore_jamendo">Jamendo</string>
     <string name="explore_youtube">YouTube</string>
     <string name="explore_search_hint">Search music…</string>
+
+    <!-- Pustaka Extended -->
+    <string name="library_albums">Albums</string>
+    <string name="library_downloaded">Downloaded</string>
+    <string name="library_top50">My Top 50</string>
+    <string name="library_cache">Saved in Cache</string>
+    <string name="library_uploaded">Uploaded</string>
+    <string name="library_local">Local</string>
+    <string name="library_your_playlists">Your Playlists</string>
+    <string name="library_sort_date_added">Date added</string>
+    <string name="library_sort_name">Name</string>
+    <string name="library_sort_date_modified">Date modified</string>
+
+    <!-- Explore Extended -->
+    <string name="explore_streaming_subtitle">STREAMING MILLIONS OF TRACKS</string>
+    <string name="explore_jamendo_subtitle">LEGAL ROYALTY-FREE MUSIC</string>
+    <string name="explore_import_spotify">Import Spotify Link (Track / Playlist)</string>
+    <string name="explore_recent_searches">Recent Searches</string>
+    <string name="explore_clear_all">Clear All</string>
+    <string name="explore_trending">Trending</string>
+    <string name="explore_popular_trending">Popular &amp; Trending Songs</string>
+
+    <!-- Beranda Extended -->
+    <string name="home_community_playlists">Trending Community Playlists</string>
+    <string name="home_spotify_charts">Spotify Charts</string>
+    <string name="home_spotify_charts_desc">Charts &amp; trending</string>
+    <string name="home_account">Account</string>
+    <string name="home_import">Import</string>
+    <string name="home_your_collection">Your Collection</string>
+    <string name="home_create_new">Create New</string>
+
+    <!-- Profile Drawer & Stats Extended -->
+    <string name="profile_view_profile">View profile</string>
+    <string name="profile_edit_name">Set profile name</string>
+    <string name="profile_listening_stats">Listening stats</string>
+    <string name="profile_recently_played">Recently Played</string>
+    <string name="profile_recently_played_desc">Open last played tracks</string>
+    <string name="profile_settings_privacy">Settings and privacy</string>
+    <string name="profile_settings_privacy_desc">Theme, language, and downloads</string>
+    <string name="stats_title">Listening Stats</string>
+    <string name="stats_time_section">MUSIC LISTENING TIME</string>
+    <string name="stats_this_week">This Week</string>
+    <string name="stats_this_month">This Month</string>
+    <string name="stats_this_year">This Year</string>
+    <string name="stats_accumulation_month">Accumulated playback this month</string>
+    <string name="stats_total_year">Total playback this year</string>
+    <string name="stats_collection_section">COLLECTION &amp; INTERACTIONS</string>
+    <string name="stats_music_collection">Music Collection</string>
+    <string name="stats_music_collection_desc">Offline songs saved on your device</string>
+    <string name="stats_liked_songs">Liked Songs</string>
+    <string name="stats_liked_songs_desc">Songs you marked with a heart</string>
+    <string name="stats_close">Close</string>
 </resources>

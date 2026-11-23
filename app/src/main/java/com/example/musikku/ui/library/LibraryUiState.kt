@@ -30,6 +30,8 @@ data class YouTubeSearchState(
     val results: List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> = emptyList(),
     val trendingTracks: List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> = emptyList(),
     val isSearching: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMoreResults: Boolean = true,
     val isLoadingStreamId: String? = null,
     val errorMessage: String? = null,
     val downloadingIds: Set<Long> = emptySet(),
@@ -48,6 +50,25 @@ data class JamendoSearchState(
     val downloadedIds: Set<Long> = emptySet()
 )
 
+data class SpotifyImportState(
+    val isImporting: Boolean = false,
+    val result: com.example.musikku.data.repository.SpotifyImportResult? = null,
+    val errorMessage: String? = null,
+    val isLoadingTrackId: String? = null
+)
+
+/** State untuk akun Spotify pengguna yang tersinkronisasi (Tahap 3). */
+data class SpotifyAccountState(
+    val isConnected: Boolean = false,
+    val isLoading: Boolean = false,
+    val profile: com.example.musikku.data.repository.SpotifyUserProfile? = null,
+    val userPlaylists: List<com.example.musikku.data.repository.SpotifyUserPlaylist> = emptyList(),
+    val isSyncingLikedSongs: Boolean = false,
+    val syncingPlaylistId: String? = null,
+    val likedSongsCount: Int = 0,
+    val errorMessage: String? = null
+)
+
 /** State untuk LibraryScreen mencakup Semua Lagu, Favorit, Playlist, YouTube Music, dan Jamendo. */
 data class LibraryUiState(
     val songs: List<SongEntity> = emptyList(),
@@ -59,12 +80,18 @@ data class LibraryUiState(
     val exploreSourceTab: ExploreSourceTab = ExploreSourceTab.YOUTUBE,
     val youTubeState: YouTubeSearchState = YouTubeSearchState(),
     val jamendoState: JamendoSearchState = JamendoSearchState(),
+    val spotifyImportState: SpotifyImportState = SpotifyImportState(),
+    val spotifyAccountState: SpotifyAccountState = SpotifyAccountState(),
     val isOnline: Boolean = true,
     val downloadOnlyWifi: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val sortOrder: SongSortOrder = SongSortOrder.TITLE_AZ,
     val recentSearches: List<String> = emptyList(),
+    val userName: String = "",
+    val userAvatarUri: String = "",
+    val userBio: String = "",
+    val listeningStats: com.example.musikku.data.repository.ListeningTimeStats = com.example.musikku.data.repository.ListeningTimeStats(),
     val isLoading: Boolean = true,
     val isEmpty: Boolean = false
 )

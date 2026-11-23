@@ -84,6 +84,9 @@ class YouTubeAwareDataSource(
 
     override fun open(dataSpec: DataSpec): Long {
         val uriStr = dataSpec.uri.toString()
+        if (dataSpec.uri.scheme == "spotify" || uriStr.isBlank() || uriStr == "about:blank") {
+            throw java.io.IOException("URI stream tidak valid untuk pemutaran langsung: $uriStr")
+        }
         val isYouTube = uriStr.contains("googlevideo.com") || uriStr.contains("youtube.com")
 
         val targetSpec = if (isYouTube) {

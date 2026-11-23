@@ -5,8 +5,10 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.musikku.data.local.dao.FavoriteDao
+import com.example.musikku.data.local.dao.ListeningStatsDao
 import com.example.musikku.data.local.dao.PlaylistDao
 import com.example.musikku.data.local.dao.SongDao
+import com.example.musikku.data.local.entity.DailyListeningStatEntity
 import com.example.musikku.data.local.entity.FavoriteEntity
 import com.example.musikku.data.local.entity.PlaylistEntity
 import com.example.musikku.data.local.entity.PlaylistSongEntity
@@ -17,15 +19,17 @@ import com.example.musikku.data.local.entity.SongEntity
         SongEntity::class,
         FavoriteEntity::class,
         PlaylistEntity::class,
-        PlaylistSongEntity::class
+        PlaylistSongEntity::class,
+        DailyListeningStatEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
     abstract fun favoriteDao(): FavoriteDao
     abstract fun playlistDao(): PlaylistDao
+    abstract fun listeningStatsDao(): ListeningStatsDao
 
     companion object {
         /** Migrasi dari Versi 1 (hanya tabel songs dasar) ke Versi 2 (tambah source & tabel playlist/favorit) */
@@ -106,6 +110,13 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `songs` ADD COLUMN `isFavorite` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `songs` ADD COLUMN `filePath` TEXT DEFAULT NULL")
                 db.execSQL("UPDATE `songs` SET `isFavorite` = 1 WHERE `id` IN (SELECT `songId` FROM `favorites`)")
+            }
+        }
+
+        /** Migrasi dari Versi 5 ke Versi 6 (tambah tabel daily_listening_stats untuk statistik mingguan, bulanan, tahunan) */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `daily_listening_stats` (`date` TEXT NOT NULL, `seconds` INTEGER NOT NULL, PRIMARY KEY(`date`))")
             }
         }
     }

@@ -7,16 +7,34 @@ import android.app.RecoverableSecurityException
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.WindowInsets
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.res.stringResource
@@ -60,6 +78,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -104,6 +123,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -112,6 +132,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
@@ -120,6 +142,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.musikku.ui.profile.SpotifyProfileDrawerContent
+import com.example.musikku.ui.profile.EditProfileDialog
+import com.example.musikku.ui.profile.ListeningStatsDialog
+import com.example.musikku.ui.profile.UserProfileAvatar
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.text.KeyboardOptions
@@ -200,15 +228,27 @@ fun LibraryScreen(
         }
     }
 
-    var selectedBottomTab by remember { mutableStateOf(AppBottomTab.LIBRARY) }
+    var selectedBottomTab by remember { mutableStateOf(AppBottomTab.BERANDA) }
+    var showSettingsScreen by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = showSettingsScreen) {
+        showSettingsScreen = false
+    }
+    val coroutineScope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showStatsDialog by remember { mutableStateOf(false) }
     var showNowPlaying by remember { mutableStateOf(false) }
     var songForAddToPlaylist by remember { mutableStateOf<SongEntity?>(null) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var selectedPlaylistForDetail by remember { mutableStateOf<PlaylistWithCount?>(null) }
+    var selectedCommunityPlaylistForDetail by remember { mutableStateOf<CommunityPlaylist?>(null) }
     var playlistForRename by remember { mutableStateOf<PlaylistWithCount?>(null) }
     var songToDelete by remember { mutableStateOf<SongEntity?>(null) }
     var pendingSystemDeleteSong by remember { mutableStateOf<SongEntity?>(null) }
     var pendingYouTubeTrackForPlaylist by remember { mutableStateOf<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto?>(null) }
+    var showSpotifyImportDialog by remember { mutableStateOf(false) }
+    var showSpotifyAccountSheet by remember { mutableStateOf(false) }
 
     val deleteIntentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -327,194 +367,250 @@ fun LibraryScreen(
             modifier = Modifier.fillMaxSize()
         ) {}
 
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                if (selectedBottomTab == AppBottomTab.LIBRARY) {
-                    LibraryTopBar(
-                        searchQuery = uiState.searchQuery,
-                        selectedTab = uiState.selectedTab,
-                        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-                        onTabSelected = { tab ->
-                            if (tab == LibraryTab.JAMENDO) {
-                                selectedBottomTab = AppBottomTab.EXPLORE
-                                viewModel.loadPopularJamendo()
-                            } else {
-                                viewModel.selectTab(tab)
+        ModalNavigationDrawer(
+            modifier = Modifier.fillMaxSize(),
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = Color(0xFF121412),
+                    modifier = Modifier
+                        .width(320.dp)
+                        .fillMaxHeight()
+                ) {
+                    SpotifyProfileDrawerContent(
+                        userName = uiState.userName,
+                        avatarUri = uiState.userAvatarUri,
+                        userBio = uiState.userBio,
+                        totalSongs = uiState.songs.size,
+                        totalFavorites = uiState.favoriteSongs.size,
+                        totalPlaylists = uiState.playlists.size,
+                        listeningStats = uiState.listeningStats,
+                        onEditProfile = {
+                            coroutineScope.launch {
+                                drawerState.close()
+                                showEditProfileDialog = true
                             }
                         },
-                        onRefreshClick = viewModel::refreshLibrary
-                    )
-                }
-            },
-            bottomBar = {
-                Column(modifier = Modifier.background(Color.Transparent)) {
-                    if (playbackState.currentSong != null) {
-                        val currentSongId = playbackState.currentSong?.id ?: -1L
-                        ModernFloatingMiniPlayer(
-                            playbackState = playbackState,
-                            isFavorite = uiState.favoriteSongIds.contains(currentSongId),
-                            onToggleFavorite = { viewModel.toggleFavorite(currentSongId) },
-                            onClick = { showNowPlaying = true },
-                            onPlayPauseClick = viewModel::playPause,
-                            onNext = viewModel::skipToNext,
-                            onPrevious = viewModel::skipToPrevious
-                        )
-                    }
-                    ModernBottomNavigationBar(
-                        selectedTab = selectedBottomTab,
-                        onTabSelected = { tab ->
-                            selectedBottomTab = tab
-                            if (tab == AppBottomTab.EXPLORE) {
-                                viewModel.loadTrendingYouTube()
-                                viewModel.loadPopularJamendo()
+                        onViewStats = {
+                            coroutineScope.launch {
+                                drawerState.close()
+                                showStatsDialog = true
                             }
+                        },
+                        onRecentlyPlayed = {
+                            coroutineScope.launch { drawerState.close() }
+                            showSettingsScreen = false
+                            selectedBottomTab = AppBottomTab.PUSTAKA
+                        },
+                        onOpenSettings = {
+                            coroutineScope.launch { drawerState.close() }
+                            showSettingsScreen = true
                         }
                     )
                 }
             }
-        ) { innerPadding ->
-        if (selectedBottomTab == AppBottomTab.SETTINGS) {
-            com.example.musikku.ui.settings.SettingsScreen(
-                currentThemeMode = uiState.themeMode,
-                currentLanguage = uiState.appLanguage,
-                downloadOnlyWifi = uiState.downloadOnlyWifi,
-                sleepTimerSeconds = playbackState.sleepTimerRemainingSeconds,
-                contentPadding = innerPadding,
-                onThemeModeChanged = viewModel::setThemeMode,
-                onLanguageChanged = viewModel::setAppLanguage,
-                onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi,
-                onSetSleepTimer = viewModel::setSleepTimer,
-                onCancelSleepTimer = viewModel::cancelSleepTimer
-            )
-        } else if (selectedBottomTab == AppBottomTab.EXPLORE) {
-            com.example.musikku.ui.explore.ExploreScreen(
-                currentTab = uiState.exploreSourceTab,
-                onTabSelected = viewModel::setExploreSourceTab,
-                youTubeState = uiState.youTubeState,
-                jamendoState = uiState.jamendoState,
-                currentPlayingTitle = playbackState.currentSong?.title,
-                currentPlayingUri = playbackState.currentSong?.contentUri,
-                isPlaying = playbackState.isPlaying,
-                isOnline = uiState.isOnline,
-                downloadOnlyWifi = uiState.downloadOnlyWifi,
-                favoriteSongIds = uiState.favoriteSongIds,
-                contentPadding = innerPadding,
-                onYouTubeSearch = viewModel::searchYouTube,
-                onYouTubePlay = viewModel::playYouTubeTrack,
-                onYouTubeAddToQueue = viewModel::addYouTubeTrackToQueue,
-                onYouTubeAddToPlaylist = { track -> pendingYouTubeTrackForPlaylist = track },
-                onYouTubeToggleFavorite = viewModel::toggleYouTubeFavorite,
-                onYouTubeDownload = viewModel::downloadYouTubeTrack,
-                onJamendoSearch = viewModel::searchJamendo,
-                onJamendoStream = viewModel::playJamendoTrack,
-                onJamendoDownload = viewModel::downloadJamendoTrack,
-                onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
-                onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi,
-                recentSearches = uiState.recentSearches,
-                onRemoveRecentSearch = viewModel::removeRecentSearch,
-                onClearRecentSearches = viewModel::clearRecentSearches
-            )
-        } else if (!hasPermission) {
-            PermissionEmptyState(
-                onRequestPermission = { permissionLauncher.launch(permissionsToRequest) },
-                modifier = Modifier.padding(innerPadding)
-            )
-        } else when {
-            uiState.isLoading -> LoadingIndicator(Modifier.padding(innerPadding))
-
-            uiState.selectedTab == LibraryTab.SONGS -> {
-                if (uiState.songs.isEmpty()) {
-                    EmptyState(
-                        query = uiState.searchQuery,
-                        onRefreshClick = viewModel::refreshLibrary,
-                        modifier = Modifier.padding(innerPadding)
+        ) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    Column(modifier = Modifier.background(Color.Transparent)) {
+                        if (playbackState.currentSong != null) {
+                            val currentSongId = playbackState.currentSong?.id ?: -1L
+                            ModernFloatingMiniPlayer(
+                                playbackState = playbackState,
+                                isFavorite = uiState.favoriteSongIds.contains(currentSongId),
+                                onToggleFavorite = { viewModel.toggleFavorite(currentSongId) },
+                                onClick = { showNowPlaying = true },
+                                onPlayPauseClick = viewModel::playPause,
+                                onNext = viewModel::skipToNext,
+                                onPrevious = viewModel::skipToPrevious
+                            )
+                        }
+                        ModernBottomNavigationBar(
+                            selectedTab = if (showSettingsScreen) null else selectedBottomTab,
+                            onTabSelected = { tab ->
+                                showSettingsScreen = false
+                                selectedBottomTab = tab
+                                if (tab == AppBottomTab.SEARCH) {
+                                    viewModel.resetExploreToTrending()
+                                }
+                            }
+                        )
+                    }
+                }
+            ) { innerPadding ->
+                if (showSettingsScreen) {
+                    com.example.musikku.ui.settings.SettingsScreen(
+                        currentThemeMode = uiState.themeMode,
+                        currentLanguage = uiState.appLanguage,
+                        downloadOnlyWifi = uiState.downloadOnlyWifi,
+                        sleepTimerSeconds = playbackState.sleepTimerRemainingSeconds,
+                        contentPadding = innerPadding,
+                        userName = uiState.userName,
+                        userAvatarUri = uiState.userAvatarUri,
+                        isSpotifyConnected = uiState.spotifyAccountState.isConnected,
+                        spotifyUserName = uiState.spotifyAccountState.profile?.displayName.orEmpty(),
+                        onOpenSpotifyAccount = { showSpotifyAccountSheet = true },
+                        onBack = { showSettingsScreen = false },
+                        onOpenProfile = { coroutineScope.launch { drawerState.open() } },
+                        onThemeModeChanged = viewModel::setThemeMode,
+                        onLanguageChanged = viewModel::setAppLanguage,
+                        onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi,
+                        onSetSleepTimer = viewModel::setSleepTimer,
+                        onCancelSleepTimer = viewModel::cancelSleepTimer
                     )
                 } else {
-                    SongList(
-                        songs = uiState.songs,
-                        currentSongId = playbackState.currentSong?.id,
-                        isPlaying = playbackState.isPlaying,
-                        favoriteSongIds = uiState.favoriteSongIds,
-                        sortOrder = uiState.sortOrder,
-                        onSortOrderChanged = viewModel::setSortOrder,
-                        contentPadding = innerPadding,
-                        onSongClick = onSongClick,
-                        onPlayAll = { songs, index -> viewModel.playAll(songs, index) },
-                        onShuffleAll = { songs -> viewModel.playAll(songs.shuffled(), 0) },
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        onAddToQueue = viewModel::addToQueue,
-                        onPlayNext = viewModel::playNext,
-                        onAddToPlaylist = { songForAddToPlaylist = it },
-                        onDeleteSong = { songToDelete = it }
-                    )
+                    AnimatedContent(
+                        targetState = selectedBottomTab,
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (slideInHorizontally(
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                                initialOffsetX = { fullWidth -> (fullWidth * 0.22f * direction).toInt() }
+                            ) + fadeIn(
+                                animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing)
+                            )).togetherWith(
+                                slideOutHorizontally(
+                                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { fullWidth -> (-fullWidth * 0.22f * direction).toInt() }
+                                ) + fadeOut(
+                                    animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+                                )
+                            )
+                        },
+                        label = "BottomTabContentTransition",
+                        modifier = Modifier.fillMaxSize()
+                    ) { currentTab ->
+                        when (currentTab) {
+                            AppBottomTab.BERANDA -> {
+                                BerandaContent(
+                                    userName = uiState.userName,
+                                    userAvatarUri = uiState.userAvatarUri,
+                                    accountConnected = uiState.spotifyAccountState.isConnected,
+                                    accountUserName = uiState.spotifyAccountState.profile?.displayName.orEmpty(),
+                                    accountUserAvatar = uiState.spotifyAccountState.profile?.avatarUrl.orEmpty(),
+                                    onOpenSpotifyAccount = { showSpotifyAccountSheet = true },
+                                    trendingTracks = uiState.youTubeState.trendingTracks,
+                                    localSongs = uiState.songs,
+                                    favoriteSongs = uiState.favoriteSongs,
+                                    playlists = uiState.playlists,
+                                    contentPadding = innerPadding,
+                                    onOpenProfile = { coroutineScope.launch { drawerState.open() } },
+                                    onRefresh = {
+                                        viewModel.refreshLibrary()
+                                        viewModel.resetExploreToTrending()
+                                    },
+                                    onPlayCommunityPlaylist = { communityPl ->
+                                        selectedCommunityPlaylistForDetail = communityPl
+                                    },
+                                    onPlayYouTubeTrack = viewModel::playYouTubeTrack,
+                                    onDownloadYouTubeTrack = viewModel::downloadYouTubeTrack,
+                                    onToggleFavoriteYouTube = viewModel::toggleYouTubeFavorite,
+                                    onPlayLocalSong = { song, songs -> viewModel.playAll(songs, songs.indexOf(song).coerceAtLeast(0)) },
+                                    onCreatePlaylist = { showCreatePlaylistDialog = true },
+                                    onOpenPlaylistDetail = { selectedPlaylistForDetail = it },
+                                    onSelectSpotifyChart = { chart ->
+                                        viewModel.importSpotifyLink("https://open.spotify.com/playlist/${chart.id}")
+                                    },
+                                    onQuickPlaySpotifyChart = { chart ->
+                                        viewModel.playSpotifyPlaylistDirectly(chart.id)
+                                    },
+                                    onOpenSpotifyImportDialog = { showSpotifyImportDialog = true }
+                                )
+                            }
+                            AppBottomTab.PUSTAKA -> {
+                                PustakaContent(
+                                    songs = uiState.songs,
+                                    favoriteSongs = uiState.favoriteSongs,
+                                    playlists = uiState.playlists,
+                                    currentSongId = playbackState.currentSong?.id,
+                                    isPlaying = playbackState.isPlaying,
+                                    contentPadding = innerPadding,
+                                    onOpenSettings = { showSettingsScreen = true },
+                                    onCreatePlaylistClick = { showCreatePlaylistDialog = true },
+                                    onPlaylistClick = { selectedPlaylistForDetail = it },
+                                    onSongClick = onSongClick,
+                                    onSongWithQueueClick = { song, queue -> viewModel.playSong(song, queue) },
+                                    onPlayAll = { songs, index -> viewModel.playAll(songs, index) },
+                                    onShuffleAll = { songs -> viewModel.playAll(songs.shuffled(), 0) },
+                                    onToggleFavorite = viewModel::toggleFavorite,
+                                    onAddToQueue = viewModel::addToQueue,
+                                    onPlayNext = viewModel::playNext,
+                                    onAddToPlaylist = { songForAddToPlaylist = it },
+                                    onDeleteSong = { songToDelete = it }
+                                )
+                            }
+                            AppBottomTab.SEARCH -> {
+                                com.example.musikku.ui.explore.ExploreScreen(
+                                    currentTab = uiState.exploreSourceTab,
+                                    onTabSelected = viewModel::setExploreSourceTab,
+                                    youTubeState = uiState.youTubeState,
+                                    jamendoState = uiState.jamendoState,
+                                    currentPlayingTitle = playbackState.currentSong?.title,
+                                    currentPlayingUri = playbackState.currentSong?.contentUri,
+                                    isPlaying = playbackState.isPlaying,
+                                    isOnline = uiState.isOnline,
+                                    downloadOnlyWifi = uiState.downloadOnlyWifi,
+                                    favoriteSongIds = uiState.favoriteSongIds,
+                                    contentPadding = innerPadding,
+                                    userName = uiState.userName,
+                                    userAvatarUri = uiState.userAvatarUri,
+                                    onOpenProfile = { coroutineScope.launch { drawerState.open() } },
+                                    onYouTubeSearch = viewModel::searchYouTube,
+                                    onYouTubePlay = viewModel::playYouTubeTrack,
+                                    onYouTubeAddToQueue = viewModel::addYouTubeTrackToQueue,
+                                    onYouTubeAddToPlaylist = { track -> pendingYouTubeTrackForPlaylist = track },
+                                    onYouTubeToggleFavorite = viewModel::toggleYouTubeFavorite,
+                                    onYouTubeDownload = viewModel::downloadYouTubeTrack,
+                                    onYouTubeLoadMore = viewModel::loadMoreYouTube,
+                                    onJamendoSearch = viewModel::searchJamendo,
+                                    onJamendoStream = viewModel::playJamendoTrack,
+                                    onJamendoDownload = viewModel::downloadJamendoTrack,
+                                    onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
+                                    onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi,
+                                    recentSearches = uiState.recentSearches,
+                                    onRemoveRecentSearch = viewModel::removeRecentSearch,
+                                    onClearRecentSearches = viewModel::clearRecentSearches,
+                                    onOpenSpotifyImportDialog = { showSpotifyImportDialog = true }
+                                )
+                            }
+                        }
+                    }
                 }
             }
-
-            uiState.selectedTab == LibraryTab.FAVORITES -> {
-                if (uiState.favoriteSongs.isEmpty()) {
-                    EmptyFavoritesState(modifier = Modifier.padding(innerPadding))
-                } else {
-                    FavoritesContent(
-                        favoriteSongs = uiState.favoriteSongs,
-                        currentSongId = playbackState.currentSong?.id,
-                        isPlaying = playbackState.isPlaying,
-                        favoriteSongIds = uiState.favoriteSongIds,
-                        contentPadding = innerPadding,
-                        onSongClick = { viewModel.playSong(it, uiState.favoriteSongs) },
-                        onPlayAll = { viewModel.playAll(uiState.favoriteSongs, 0) },
-                        onShuffleAll = { viewModel.playAll(uiState.favoriteSongs.shuffled(), 0) },
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        onAddToQueue = viewModel::addToQueue,
-                        onPlayNext = viewModel::playNext,
-                        onAddToPlaylist = { songForAddToPlaylist = it },
-                        onDeleteSong = { songToDelete = it }
-                    )
-                }
-            }
-
-            uiState.selectedTab == LibraryTab.PLAYLISTS -> {
-                PlaylistsContent(
-                    playlists = uiState.playlists,
-                    favoriteCount = uiState.favoriteSongs.size,
-                    onOpenFavorites = { viewModel.selectTab(LibraryTab.FAVORITES) },
-                    onPlayFavorites = { if (uiState.favoriteSongs.isNotEmpty()) viewModel.playAll(uiState.favoriteSongs, 0) },
-                    contentPadding = innerPadding,
-                    onCreateClick = { showCreatePlaylistDialog = true },
-                    onPlaylistClick = { selectedPlaylistForDetail = it },
-                    onDeletePlaylist = { viewModel.deletePlaylist(it.id) },
-                    onRenamePlaylist = { playlistForRename = it }
-                )
-            }
-
-            uiState.selectedTab == LibraryTab.JAMENDO -> {
-                com.example.musikku.ui.explore.ExploreScreen(
-                    currentTab = uiState.exploreSourceTab,
-                    onTabSelected = viewModel::setExploreSourceTab,
-                    youTubeState = uiState.youTubeState,
-                    jamendoState = uiState.jamendoState,
-                    currentPlayingTitle = playbackState.currentSong?.title,
-                    currentPlayingUri = playbackState.currentSong?.contentUri,
-                    isPlaying = playbackState.isPlaying,
-                    isOnline = uiState.isOnline,
-                    downloadOnlyWifi = uiState.downloadOnlyWifi,
-                    contentPadding = innerPadding,
-                    onYouTubeSearch = viewModel::searchYouTube,
-                    onYouTubePlay = viewModel::playYouTubeTrack,
-                    onYouTubeAddToQueue = viewModel::addYouTubeTrackToQueue,
-                    onYouTubeAddToPlaylist = { track -> pendingYouTubeTrackForPlaylist = track },
-                    onJamendoSearch = viewModel::searchJamendo,
-                    onJamendoStream = viewModel::playJamendoTrack,
-                    onJamendoDownload = viewModel::downloadJamendoTrack,
-                    onJamendoDeleteDownload = viewModel::deleteDownloadedTrack,
-                    onToggleDownloadOnlyWifi = viewModel::toggleDownloadOnlyWifi
-                )
-            }
-        }
     }
     }
 
     // ─── Dialogs & Sheets ────────────────────────────────────────────────────────
+
+    // Dialog Edit Profil Pengguna (Gaya Spotify)
+    if (showEditProfileDialog) {
+        EditProfileDialog(
+            currentName = uiState.userName,
+            currentAvatarUri = uiState.userAvatarUri,
+            currentBio = uiState.userBio,
+            onSave = { name, avatar, bio ->
+                viewModel.updateUserName(name)
+                viewModel.updateUserAvatarUri(avatar)
+                viewModel.updateUserBio(bio)
+            },
+            onDismiss = { showEditProfileDialog = false }
+        )
+    }
+
+    // Dialog Statistik Mendengarkan Musik
+    if (showStatsDialog) {
+        ListeningStatsDialog(
+            totalSongs = uiState.songs.size,
+            totalFavorites = uiState.favoriteSongs.size,
+            totalPlaylists = uiState.playlists.size,
+            listeningStats = uiState.listeningStats,
+            isPlaying = playbackState.isPlaying,
+            onDismiss = { showStatsDialog = false }
+        )
+    }
 
     // Dialog Tambah ke Playlist
     songForAddToPlaylist?.let { song ->
@@ -598,6 +694,20 @@ fun LibraryScreen(
         )
     }
 
+    // Sheet Detail Trending Community Playlist
+    selectedCommunityPlaylistForDetail?.let { playlist ->
+        CommunityPlaylistDetailSheet(
+            playlist = playlist,
+            onDismiss = { selectedCommunityPlaylistForDetail = null },
+            onPlayTrack = { track -> viewModel.playYouTubeTrack(track) },
+            onPlayAll = { tracks -> tracks.firstOrNull()?.let { viewModel.playYouTubeTrack(it) } },
+            onShuffleAll = { tracks -> tracks.shuffled().firstOrNull()?.let { viewModel.playYouTubeTrack(it) } },
+            loadTracks = { query -> viewModel.searchYouTubeForCommunity(query) },
+            currentPlayingTitle = playbackState.currentSong?.title,
+            isPlaying = playbackState.isPlaying
+        )
+    }
+
     // Sheet Pemutar Penuh (Now Playing) & Antrean
     if (showNowPlaying && playbackState.currentSong != null) {
         val currentSongId = playbackState.currentSong?.id ?: -1L
@@ -627,6 +737,78 @@ fun LibraryScreen(
             onDownload = viewModel::downloadCurrentPlayingSong,
             lyricsState = lyricsState,
             onRetryLyrics = { viewModel.fetchLyrics() }
+        )
+    }
+
+    // Dialog Tempel Link Spotify
+    if (showSpotifyImportDialog) {
+        com.example.musikku.ui.spotify.SpotifyImportDialog(
+            isLoading = uiState.spotifyImportState.isImporting,
+            onDismiss = { showSpotifyImportDialog = false },
+            onImport = { url ->
+                viewModel.importSpotifyLink(url)
+                showSpotifyImportDialog = false
+            }
+        )
+    }
+
+    // Bottom Sheet Hasil Impor Spotify
+    val spotifyResult = uiState.spotifyImportState.result
+    if (spotifyResult != null) {
+        com.example.musikku.ui.spotify.SpotifyImportSheet(
+            result = spotifyResult,
+            currentPlayingTitle = playbackState.currentSong?.title,
+            isPlaying = playbackState.isPlaying,
+            isLoadingTrackId = uiState.spotifyImportState.isLoadingTrackId,
+            onDismiss = viewModel::clearSpotifyImport,
+            onPlayTrack = viewModel::playSpotifyTrack,
+            onPlayAll = viewModel::playAllSpotifyTracks,
+            onShuffleAll = viewModel::shuffleAllSpotifyTracks,
+            onSaveToLibrary = viewModel::saveSpotifyPlaylistToLibrary
+        )
+    }
+
+    // Indikator Loading Impor Spotify
+    if (uiState.spotifyImportState.isImporting) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF141714),
+                border = BorderStroke(1.dp, com.example.musikku.ui.theme.EmeraldSpotify.copy(alpha = 0.35f)),
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(20.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = com.example.musikku.ui.theme.EmeraldSpotify,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "Mengambil data Spotify...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+
+    // Bottom Sheet Akun Spotify (Tahap 3)
+    if (showSpotifyAccountSheet) {
+        com.example.musikku.ui.spotify.SpotifyAccountSheet(
+            accountState = uiState.spotifyAccountState,
+            onDismiss = { showSpotifyAccountSheet = false },
+            onLoginClick = { context, clientId -> viewModel.startSpotifyLogin(context, clientId) },
+            onConnectTokenClick = viewModel::connectSpotifyWithAccessToken,
+            onSyncLikedSongs = viewModel::syncSpotifyLikedSongs,
+            onImportPlaylist = viewModel::importSpotifyUserPlaylist,
+            onRefreshData = viewModel::refreshSpotifyProfileAndPlaylists,
+            onDisconnect = viewModel::disconnectSpotify
         )
     }
 
@@ -707,6 +889,9 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryTopBar(
+    userName: String,
+    userAvatarUri: String,
+    onAvatarClick: () -> Unit,
     searchQuery: String,
     selectedTab: LibraryTab,
     onSearchQueryChanged: (String) -> Unit,
@@ -724,27 +909,40 @@ private fun LibraryTopBar(
                 .statusBarsPadding()
                 .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)
         ) {
-        // ─── Header: KOLEKSIMU / Library + Circular Refresh Button ───────
+        // ─── Header: Profil Avatar + KOLEKSIMU / Library + Circular Refresh Button ───────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "KOLEKSIMU",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TextMuted,
-                    letterSpacing = 1.8.sp
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserProfileAvatar(
+                    userName = userName,
+                    avatarUri = userAvatarUri,
+                    size = 42.dp,
+                    onClick = onAvatarClick
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Library",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column {
+                    Text(
+                        text = "KOLEKSIMU",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.8.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Library",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
             }
 
             Box(
@@ -1668,7 +1866,7 @@ private fun PlaylistsContent(
 
 @Composable
 private fun ModernBottomNavigationBar(
-    selectedTab: AppBottomTab,
+    selectedTab: AppBottomTab?,
     onTabSelected: (AppBottomTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1692,28 +1890,28 @@ private fun ModernBottomNavigationBar(
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Tab 1: Library
+                // Tab 1: Beranda (Home)
                 BottomNavTabItem(
-                    label = stringResource(R.string.nav_library),
+                    label = stringResource(R.string.nav_beranda),
+                    icon = Icons.Default.Home,
+                    isSelected = selectedTab == AppBottomTab.BERANDA,
+                    onClick = { onTabSelected(AppBottomTab.BERANDA) }
+                )
+
+                // Tab 2: Pustaka (Tengah)
+                BottomNavTabItem(
+                    label = stringResource(R.string.nav_pustaka),
                     icon = Icons.Default.LibraryMusic,
-                    isSelected = selectedTab == AppBottomTab.LIBRARY,
-                    onClick = { onTabSelected(AppBottomTab.LIBRARY) }
+                    isSelected = selectedTab == AppBottomTab.PUSTAKA,
+                    onClick = { onTabSelected(AppBottomTab.PUSTAKA) }
                 )
 
-                // Tab 2: Jelajah
+                // Tab 3: Search (Paling Kanan)
                 BottomNavTabItem(
-                    label = stringResource(R.string.nav_explore),
-                    icon = Icons.Default.Explore,
-                    isSelected = selectedTab == AppBottomTab.EXPLORE,
-                    onClick = { onTabSelected(AppBottomTab.EXPLORE) }
-                )
-
-                // Tab 3: Pengaturan
-                BottomNavTabItem(
-                    label = stringResource(R.string.nav_settings),
-                    icon = Icons.Default.Tune,
-                    isSelected = selectedTab == AppBottomTab.SETTINGS,
-                    onClick = { onTabSelected(AppBottomTab.SETTINGS) }
+                    label = stringResource(R.string.nav_search),
+                    icon = Icons.Default.Search,
+                    isSelected = selectedTab == AppBottomTab.SEARCH,
+                    onClick = { onTabSelected(AppBottomTab.SEARCH) }
                 )
             }
         }
@@ -1727,58 +1925,86 @@ private fun BottomNavTabItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    if (isSelected) {
-        // Active capsule pill: Soft green translucent glass with green border
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(Color(0xFF67E8A6).copy(alpha = 0.18f))
-                .border(BorderStroke(1.2.dp, Color(0xFF67E8A6).copy(alpha = 0.55f)), RoundedCornerShape(50))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 20.dp, vertical = 9.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = Color(0xFF67E8A6),
-                    modifier = Modifier.size(20.dp)
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF67E8A6).copy(alpha = 0.18f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 250),
+        label = "navTabBgColor"
+    )
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF67E8A6).copy(alpha = 0.55f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 250),
+        label = "navTabBorderColor"
+    )
+    val animatedIconColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF67E8A6) else Color.White.copy(alpha = 0.65f),
+        animationSpec = tween(durationMillis = 250),
+        label = "navTabIconColor"
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (isSelected) 18.dp else 14.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "navTabPadding"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(animatedBgColor)
+            .border(BorderStroke(1.2.dp, animatedBorderColor), RoundedCornerShape(50))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = horizontalPadding, vertical = 9.dp)
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF67E8A6)
-                )
-            }
-        }
-    } else {
-        // Inactive: Ikon dan teks halus transparan
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+            )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(22.dp)
+                tint = animatedIconColor,
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.7f),
-                fontWeight = FontWeight.Medium
-            )
+            AnimatedVisibility(
+                visible = isSelected,
+                enter = fadeIn(tween(180, delayMillis = 40)) + expandHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ),
+                exit = fadeOut(tween(100)) + shrinkHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF67E8A6),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
         }
     }
 }
@@ -1796,9 +2022,9 @@ private fun LoadingIndicator(modifier: Modifier = Modifier) {
 }
 
 enum class AppBottomTab {
-    LIBRARY,
-    EXPLORE,
-    SETTINGS
+    BERANDA,
+    PUSTAKA,
+    SEARCH
 }
 
 @Composable

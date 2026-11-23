@@ -51,14 +51,60 @@ class YouTubeMusicRepository(
         return@withContext searchMusic("Lagu Pop Indonesia Terbaru")
     }
 
+    @Volatile
+    private var currentSearchQueryHandler: org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler? = null
+    @Volatile
+    private var currentSearchNextPage: org.schabi.newpipe.extractor.Page? = null
+    @Volatile
+    private var currentInvidiousPage: Int = 1
+    @Volatile
+    private var currentSearchQuery: String = ""
+
+    fun hasMore(): Boolean {
+        return currentSearchNextPage != null || currentInvidiousPage > 0
+    }
+
+    private fun extractStreamItems(items: List<org.schabi.newpipe.extractor.InfoItem>?): List<YouTubeSearchItemDto> {
+        if (items == null) return emptyList()
+        return items.mapNotNull { infoItem ->
+            if (infoItem is org.schabi.newpipe.extractor.stream.StreamInfoItem) {
+                val url = infoItem.url.orEmpty()
+                val videoId = if (url.contains("v=")) {
+                    url.substringAfter("v=").substringBefore("&")
+                } else {
+                    url.substringAfterLast("/")
+                }
+                if (videoId.isNotBlank()) {
+                    YouTubeSearchItemDto(
+                        type = "video",
+                        title = infoItem.name.orEmpty(),
+                        videoId = videoId,
+                        author = infoItem.uploaderName,
+                        authorUrl = infoItem.uploaderUrl,
+                        lengthSeconds = infoItem.duration.let { if (it > 0) it else 0L },
+                        viewCount = infoItem.viewCount.let { if (it > 0) it else 0L },
+                        videoThumbnails = null
+                    )
+                } else null
+            } else null
+        }
+    }
+
     /**
      * Cari lagu atau video musik berdasarkan kata kunci pencarian.
+     * Mengambil halaman 1 dan otomatis menggabungkan halaman 2 jika tersedia
+     * agar daftar hasil pencarian awal lebih banyak dan lengkap (~35-40 lagu).
      */
     suspend fun searchMusic(query: String): Result<List<YouTubeSearchItemDto>> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
             return@withContext getTrendingMusic()
         }
+
+        currentSearchQuery = trimmed
+        currentSearchNextPage = null
+        currentSearchQueryHandler = null
+        currentInvidiousPage = 1
 
         // ─── 1. Prioritas Utama: Ekstraksi pencarian langsung via NewPipeExtractor ───
         try {
@@ -68,31 +114,31 @@ class YouTubeMusicRepository(
                 org.schabi.newpipe.extractor.ServiceList.YouTube,
                 queryHandler
             )
-            val items = searchInfo.relatedItems.mapNotNull { infoItem ->
-                if (infoItem is org.schabi.newpipe.extractor.stream.StreamInfoItem) {
-                    val url = infoItem.url.orEmpty()
-                    val videoId = if (url.contains("v=")) {
-                        url.substringAfter("v=").substringBefore("&")
-                    } else {
-                        url.substringAfterLast("/")
-                    }
-                    if (videoId.isNotBlank()) {
-                        YouTubeSearchItemDto(
-                            type = "video",
-                            title = infoItem.name.orEmpty(),
-                            videoId = videoId,
-                            author = infoItem.uploaderName,
-                            authorUrl = infoItem.uploaderUrl,
-                            lengthSeconds = infoItem.duration.let { if (it > 0) it else 0L },
-                            viewCount = infoItem.viewCount.let { if (it > 0) it else 0L },
-                            videoThumbnails = null
-                        )
-                    } else null
-                } else null
+            val page1Items = extractStreamItems(searchInfo.relatedItems)
+            val allItems = mutableListOf<YouTubeSearchItemDto>()
+            allItems.addAll(page1Items)
+
+            currentSearchQueryHandler = queryHandler
+            if (searchInfo.hasNextPage()) {
+                currentSearchNextPage = searchInfo.nextPage
+                // Ambil halaman kedua secara otomatis agar hasil awal lebih lengkap
+                try {
+                    val morePage = org.schabi.newpipe.extractor.search.SearchInfo.getMoreItems(
+                        org.schabi.newpipe.extractor.ServiceList.YouTube,
+                        queryHandler,
+                        searchInfo.nextPage
+                    )
+                    val page2Items = extractStreamItems(morePage.items)
+                    allItems.addAll(page2Items)
+                    currentSearchNextPage = if (morePage.hasNextPage()) morePage.nextPage else null
+                } catch (e: Exception) {
+                    Log.w(TAG, "Halaman 2 belum dimuat: ${e.message}")
+                }
             }
-            if (items.isNotEmpty()) {
-                Log.d(TAG, "Sukses mencari '$trimmed' via NewPipeExtractor! Ditemukan ${items.size} item")
-                return@withContext Result.success(items)
+
+            if (allItems.isNotEmpty()) {
+                Log.d(TAG, "Sukses mencari '$trimmed' via NewPipeExtractor! Total ${allItems.size} item")
+                return@withContext Result.success(allItems)
             }
         } catch (e: Throwable) {
             Log.w(TAG, "NewPipeExtractor pencarian gagal: ${e.message}, mencoba fallback Invidious...")
@@ -113,10 +159,11 @@ class YouTubeMusicRepository(
             try {
                 Log.d(TAG, "Mencari '$trimmed' di instance: $base (percobaan ${attempt + 1}/$maxAttempts)")
                 val endpoint = "$base/api/v1/search"
-                val items = apiService.searchVideos(endpoint = endpoint, query = trimmed, type = "video")
+                val items = apiService.searchVideos(endpoint = endpoint, query = trimmed, type = "video", page = 1)
                 val validItems = items.filter { it.videoId.isNotBlank() }
                 if (validItems.isNotEmpty()) {
                     instanceManager.markSuccess(base)
+                    currentInvidiousPage = 1
                     return@withContext Result.success(validItems)
                 }
             } catch (e: Exception) {
@@ -127,6 +174,66 @@ class YouTubeMusicRepository(
         }
 
         Result.failure(lastException ?: Exception("Gagal mencari lagu di YouTube Music. Periksa koneksi internet atau coba lagi nanti."))
+    }
+
+    /**
+     * Memuat halaman lagu berikutnya (Infinite Scroll / Muat Lebih Banyak) untuk pencarian aktif.
+     */
+    suspend fun loadMoreSearchResults(): Result<List<YouTubeSearchItemDto>> = withContext(Dispatchers.IO) {
+        val query = currentSearchQuery
+        if (query.isBlank()) {
+            return@withContext Result.success(emptyList())
+        }
+
+        // 1. NewPipeExtractor pagination jika ada halaman berikutnya
+        val page = currentSearchNextPage
+        val qh = currentSearchQueryHandler
+        if (page != null && qh != null) {
+            try {
+                Log.d(TAG, "Memuat halaman berikutnya via NewPipeExtractor untuk '$query'...")
+                val morePage = org.schabi.newpipe.extractor.search.SearchInfo.getMoreItems(
+                    org.schabi.newpipe.extractor.ServiceList.YouTube,
+                    qh,
+                    page
+                )
+                currentSearchNextPage = if (morePage.hasNextPage()) morePage.nextPage else null
+                val newItems = extractStreamItems(morePage.items)
+                if (newItems.isNotEmpty()) {
+                    Log.d(TAG, "Berhasil memuat ${newItems.size} lagu berikutnya via NewPipeExtractor")
+                    return@withContext Result.success(newItems)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal memuat halaman berikutnya via NewPipeExtractor: ${e.message}")
+            }
+        }
+
+        // 2. Invidious pagination fallback
+        val nextPageNum = currentInvidiousPage + 1
+        val instances = instanceManager.getAllInstances()
+        val maxAttempts = minOf(MAX_RETRY_ATTEMPTS, instances.size)
+        for (attempt in 0 until maxAttempts) {
+            val base = if (attempt == 0) instanceManager.getWorkingInstance() else (instances.getOrNull(attempt) ?: break)
+            try {
+                val endpoint = "$base/api/v1/search"
+                val items = apiService.searchVideos(
+                    endpoint = endpoint,
+                    query = query,
+                    type = "video",
+                    page = nextPageNum
+                )
+                val validItems = items.filter { it.videoId.isNotBlank() }
+                if (validItems.isNotEmpty()) {
+                    currentInvidiousPage = nextPageNum
+                    instanceManager.markSuccess(base)
+                    Log.d(TAG, "Berhasil memuat ${validItems.size} lagu berikutnya via Invidious (page $nextPageNum)")
+                    return@withContext Result.success(validItems)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Invidious load more gagal di $base: ${e.message}")
+            }
+        }
+
+        Result.success(emptyList())
     }
 
     /**

@@ -4,8 +4,12 @@
     <string name="playback_channel_name">음악 재생</string>
 
     <!-- Navigation -->
+    <string name="nav_beranda">홈</string>
+    <string name="nav_pustaka">라이브러리</string>
+    <string name="nav_home">홈</string>
+    <string name="nav_search">검색</string>
     <string name="nav_library">라이브러리</string>
-    <string name="nav_explore">탐색</string>
+    <string name="nav_explore">검색</string>
     <string name="nav_settings">설정</string>
 
     <!-- Settings -->

@@ -1,11 +1,19 @@
 package com.example.musikku.data.worker
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.example.musikku.MainActivity
 import com.example.musikku.appContainer
 import com.example.musikku.data.local.entity.SongEntity
 import com.example.musikku.security.SecurityGuard
@@ -15,11 +23,12 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 /**
- * Worker WorkManager untuk mengunduh lagu dari Jamendo di latar belakang,
- * memantau kemajuan unduhan, dan mencatatnya ke Room dengan source="DOWNLOADED"
- * dan filePath lokal agar dapat diputar secara offline.
+ * Worker WorkManager untuk mengunduh lagu dari Jamendo & YouTube Music di latar belakang,
+ * menampilkan notifikasi progres pengunduhan secara real-time,
+ * dan mencatatnya ke Room dengan source="DOWNLOADED" agar dapat diputar offline.
  */
 class DownloadSongWorker(
     private val context: Context,
@@ -35,13 +44,16 @@ class DownloadSongWorker(
         const val KEY_DOWNLOAD_URL = "key_download_url"
         const val KEY_ALBUM_ART_URL = "key_album_art_url"
         const val KEY_PROGRESS = "progress"
+
+        const val CHANNEL_ID = "musikku_download_channel"
+        const val CHANNEL_NAME = "Unduhan Lagu"
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val songId = inputData.getLong(KEY_SONG_ID, -1L)
         val title = inputData.getString(KEY_TITLE) ?: return@withContext Result.failure()
-        val artist = inputData.getString(KEY_ARTIST) ?: "Jamendo Artist"
-        val album = inputData.getString(KEY_ALBUM) ?: "Jamendo Music"
+        val artist = inputData.getString(KEY_ARTIST) ?: "Artis"
+        val album = inputData.getString(KEY_ALBUM) ?: "Musik"
         val duration = inputData.getLong(KEY_DURATION, 0L)
         val downloadUrl = inputData.getString(KEY_DOWNLOAD_URL) ?: return@withContext Result.failure()
         val albumArtUrl = inputData.getString(KEY_ALBUM_ART_URL) ?: ""
@@ -49,6 +61,26 @@ class DownloadSongWorker(
         if (songId == -1L || downloadUrl.isBlank()) {
             return@withContext Result.failure()
         }
+
+        val notificationManager = NotificationManagerCompat.from(context)
+        val notificationId = (songId.hashCode() and 0x7FFFFFFF).let { if (it == 0) 1001 else it }
+        val pendingIntent = createPendingIntent()
+
+        createNotificationChannel()
+
+        // Notifikasi Awal: Menyiapkan Unduhan
+        val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("Mengunduh Lagu")
+            .setContentText("$title • $artist")
+            .setSubText("0%")
+            .setProgress(100, 0, false)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+
+        notifySafe(notificationManager, notificationId, notificationBuilder.build())
 
         try {
             setProgress(workDataOf(KEY_PROGRESS to 0))
@@ -63,6 +95,13 @@ class DownloadSongWorker(
             // Validasi ruang penyimpanan perangkat (storage penuh)
             val freeBytes = musicDir.usableSpace
             if (freeBytes < 15 * 1024 * 1024L) {
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Penyimpanan HP penuh. Kosongkan ruang untuk mengunduh lagu.",
+                    pendingIntent
+                )
                 return@withContext Result.failure(
                     workDataOf("error" to "Penyimpanan HP penuh. Kosongkan ruang penyimpanan untuk mengunduh lagu.")
                 )
@@ -77,6 +116,13 @@ class DownloadSongWorker(
 
             // Proteksi Path Traversal: Cegah penulisan di luar folder unduhan
             if (!SecurityGuard.validateSafeFilePath(musicDir, targetFile)) {
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Peringatan Keamanan: Percobaan manipulasi path file.",
+                    pendingIntent
+                )
                 return@withContext Result.failure(
                     workDataOf("error" to "Peringatan Keamanan: Terdeteksi percobaan manipulasi path file.")
                 )
@@ -97,17 +143,32 @@ class DownloadSongWorker(
             connection.connect()
 
             if (connection.responseCode !in 200..299) {
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Gagal menghubungkan ke server unduhan (HTTP ${connection.responseCode}).",
+                    pendingIntent
+                )
                 return@withContext Result.retry()
             }
 
             val totalBytes = connection.contentLengthLong
             if (totalBytes > 0 && freeBytes < totalBytes + 5 * 1024 * 1024L) {
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Ruang penyimpanan tidak mencukupi untuk file audio ini.",
+                    pendingIntent
+                )
                 return@withContext Result.failure(
                     workDataOf("error" to "Ruang penyimpanan tidak mencukupi untuk file audio ini.")
                 )
             }
             var bytesRead = 0L
             var lastReportedPercent = 0
+            var lastMbReported = -1L
 
             connection.inputStream.use { input ->
                 FileOutputStream(targetFile).use { output ->
@@ -116,15 +177,32 @@ class DownloadSongWorker(
                     while (input.read(buffer).also { read = it } != -1) {
                         if (isStopped) {
                             targetFile.delete()
+                            cancelNotificationSafe(notificationManager, notificationId)
                             return@withContext Result.failure()
                         }
                         output.write(buffer, 0, read)
                         bytesRead += read
+
                         if (totalBytes > 0) {
                             val percent = ((bytesRead * 100) / totalBytes).toInt().coerceIn(0, 100)
                             if (percent >= lastReportedPercent + 5 || percent == 100) {
                                 lastReportedPercent = percent
                                 setProgress(workDataOf(KEY_PROGRESS to percent))
+
+                                notificationBuilder
+                                    .setSubText("$percent%")
+                                    .setProgress(100, percent, false)
+                                notifySafe(notificationManager, notificationId, notificationBuilder.build())
+                            }
+                        } else {
+                            val mbUnit = bytesRead / (512 * 1024L)
+                            if (mbUnit > lastMbReported) {
+                                lastMbReported = mbUnit
+                                val mbText = String.format(Locale.getDefault(), "%.1f MB", bytesRead / (1024.0 * 1024.0))
+                                notificationBuilder
+                                    .setSubText(mbText)
+                                    .setProgress(0, 0, true)
+                                notifySafe(notificationManager, notificationId, notificationBuilder.build())
                             }
                         }
                     }
@@ -137,11 +215,25 @@ class DownloadSongWorker(
             val audioValidation = SecurityGuard.validateAudioMagicBytes(targetFile)
             if (audioValidation == SecurityGuard.AudioValidationResult.MALICIOUS_EXECUTABLE) {
                 targetFile.delete()
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Berkas berbahaya (Malware) terdeteksi dan telah dimusnahkan.",
+                    pendingIntent
+                )
                 return@withContext Result.failure(
                     workDataOf("error" to "Berkas terdeteksi sebagai muatan berbahaya (Malware) dan telah dimusnahkan.")
                 )
             } else if (audioValidation == SecurityGuard.AudioValidationResult.CORRUPTED_OR_EMPTY) {
                 targetFile.delete()
+                showFailureNotification(
+                    notificationManager,
+                    notificationId,
+                    title,
+                    "Berkas audio yang diunduh rusak atau kosong.",
+                    pendingIntent
+                )
                 return@withContext Result.failure(
                     workDataOf("error" to "Berkas audio rusak atau korup.")
                 )
@@ -167,10 +259,103 @@ class DownloadSongWorker(
 
             database.songDao().insertAll(listOf(downloadedSong))
 
+            // Notifikasi Selesai: Berhasil Diunduh
+            val successNotification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("Unduhan Selesai")
+                .setContentText("$title ($artist) berhasil diunduh")
+                .setSubText(null)
+                .setProgress(0, 0, false)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+
+            notifySafe(notificationManager, notificationId, successNotification)
+
             Result.success()
         } catch (e: Exception) {
             e.printStackTrace()
+            showFailureNotification(
+                notificationManager,
+                notificationId,
+                title,
+                e.localizedMessage ?: "Terjadi kesalahan saat mengunduh",
+                pendingIntent
+            )
             Result.retry()
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Menampilkan progres dan status unduhan lagu"
+                setShowBadge(false)
+            }
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createPendingIntent(): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun showFailureNotification(
+        manager: NotificationManagerCompat,
+        notificationId: Int,
+        title: String,
+        errorMsg: String,
+        pendingIntent: PendingIntent
+    ) {
+        val failNotification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle("Gagal Mengunduh")
+            .setContentText("$title: $errorMsg")
+            .setSubText(null)
+            .setProgress(0, 0, false)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        notifySafe(manager, notificationId, failNotification)
+    }
+
+    private fun notifySafe(
+        manager: NotificationManagerCompat,
+        id: Int,
+        notification: android.app.Notification
+    ) {
+        try {
+            manager.notify(id, notification)
+        } catch (_: SecurityException) {
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun cancelNotificationSafe(
+        manager: NotificationManagerCompat,
+        id: Int
+    ) {
+        try {
+            manager.cancel(id)
+        } catch (_: Exception) {
         }
     }
 }

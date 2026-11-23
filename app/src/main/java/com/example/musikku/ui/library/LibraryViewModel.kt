@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import com.example.musikku.data.remote.youtube.toYouTubeSearchItemDto
 import kotlinx.coroutines.flow.first
@@ -43,7 +44,9 @@ class LibraryViewModel(
     val lyricsRepository: com.example.musikku.data.repository.LyricsRepository,
     val settingsRepository: SettingsRepository,
     val networkMonitor: NetworkMonitor,
-    val musicController: MusicController
+    val musicController: MusicController,
+    val listeningStatsRepository: com.example.musikku.data.repository.ListeningStatsRepository? = null,
+    val spotifyRepository: com.example.musikku.data.repository.SpotifyRepository? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -52,6 +55,8 @@ class LibraryViewModel(
     private val _exploreSourceTab = MutableStateFlow(ExploreSourceTab.YOUTUBE)
     private val _youTubeState = MutableStateFlow(YouTubeSearchState())
     private val _jamendoState = MutableStateFlow(JamendoSearchState())
+    private val _spotifyImportState = MutableStateFlow(SpotifyImportState())
+    private val _spotifyAccountState = MutableStateFlow(SpotifyAccountState())
     private val _sortOrder = MutableStateFlow(SongSortOrder.TITLE_AZ)
 
     private val songsFlow = _searchQuery.flatMapLatest { query ->
@@ -83,21 +88,29 @@ class LibraryViewModel(
         val exploreSourceTab: ExploreSourceTab,
         val youTubeState: YouTubeSearchState,
         val jamendoState: JamendoSearchState,
+        val spotifyImportState: SpotifyImportState,
+        val spotifyAccountState: SpotifyAccountState,
         val sortOrder: SongSortOrder,
         val isLoading: Boolean,
         val isOnline: Boolean,
         val downloadOnlyWifi: Boolean,
         val themeMode: ThemeMode,
         val appLanguage: AppLanguage,
-        val recentSearches: List<String>
+        val recentSearches: List<String>,
+        val userName: String,
+        val userAvatarUri: String,
+        val userBio: String,
+        val listeningStats: com.example.musikku.data.repository.ListeningTimeStats
     )
+
+    private val defaultListeningStatsFlow = MutableStateFlow(com.example.musikku.data.repository.ListeningTimeStats())
 
     private val tabQueryFlow = combine(
         combine(_selectedTab, _searchQuery, _exploreSourceTab, _youTubeState) { tab, q, expTab, ytState ->
             listOf(tab, q, expTab, ytState)
         },
-        combine(_jamendoState, _sortOrder, _isLoading) { jamendo, sort, loading ->
-            listOf(jamendo, sort, loading)
+        combine(_jamendoState, _sortOrder, _isLoading, _spotifyImportState, _spotifyAccountState) { jamendo, sort, loading, spotify, account ->
+            listOf(jamendo, sort, loading, spotify, account)
         },
         combine(
             networkMonitor.isOnline,
@@ -107,8 +120,16 @@ class LibraryViewModel(
             settingsRepository.recentSearches
         ) { online, wifiOnly, theme, lang, recents ->
             listOf(online, wifiOnly, theme, lang, recents)
+        },
+        combine(
+            settingsRepository.userName,
+            settingsRepository.userAvatarUri,
+            settingsRepository.userBio,
+            listeningStatsRepository?.liveStats ?: defaultListeningStatsFlow
+        ) { name, avatar, bio, stats ->
+            listOf(name, avatar, bio, stats)
         }
-    ) { list1, list2, list3 ->
+    ) { list1, list2, list3, list4 ->
         @Suppress("UNCHECKED_CAST")
         CombinedTabState(
             tab = list1[0] as LibraryTab,
@@ -118,11 +139,17 @@ class LibraryViewModel(
             jamendoState = list2[0] as JamendoSearchState,
             sortOrder = list2[1] as SongSortOrder,
             isLoading = list2[2] as Boolean,
+            spotifyImportState = list2[3] as SpotifyImportState,
+            spotifyAccountState = list2[4] as SpotifyAccountState,
             isOnline = list3[0] as Boolean,
             downloadOnlyWifi = list3[1] as Boolean,
             themeMode = list3[2] as ThemeMode,
             appLanguage = list3[3] as AppLanguage,
-            recentSearches = list3[4] as List<String>
+            recentSearches = list3[4] as List<String>,
+            userName = list4[0] as String,
+            userAvatarUri = list4[1] as String,
+            userBio = list4[2] as String,
+            listeningStats = list4[3] as com.example.musikku.data.repository.ListeningTimeStats
         )
     }
 
@@ -147,12 +174,18 @@ class LibraryViewModel(
             exploreSourceTab = tabState.exploreSourceTab,
             youTubeState = tabState.youTubeState,
             jamendoState = tabState.jamendoState,
+            spotifyImportState = tabState.spotifyImportState,
+            spotifyAccountState = tabState.spotifyAccountState,
             isOnline = tabState.isOnline,
             downloadOnlyWifi = tabState.downloadOnlyWifi,
             themeMode = tabState.themeMode,
             appLanguage = tabState.appLanguage,
             sortOrder = tabState.sortOrder,
             recentSearches = tabState.recentSearches,
+            userName = tabState.userName,
+            userAvatarUri = tabState.userAvatarUri,
+            userBio = tabState.userBio,
+            listeningStats = tabState.listeningStats,
             isLoading = tabState.isLoading,
             isEmpty = !tabState.isLoading && when (tabState.tab) {
                 LibraryTab.SONGS -> sortedSongs.isEmpty()
@@ -180,6 +213,11 @@ class LibraryViewModel(
 
     init {
         refreshLibrary()
+
+        // Sambungkan resolver stream audio untuk MusicController (Spotify & YouTube expired)
+        musicController.onResolveSongStream = { song ->
+            resolveSongIfNeeded(song)
+        }
 
         // Pantau pergantian lagu dan muat lirik otomatis dari LRCLIB
         viewModelScope.launch {
@@ -209,6 +247,27 @@ class LibraryViewModel(
                 val idSet = downloadedIds.toSet()
                 _jamendoState.update { it.copy(downloadedIds = idSet) }
                 _youTubeState.update { it.copy(downloadedIds = idSet) }
+            }
+        }
+
+        // Pantau status login / sinkronisasi Akun Spotify (Tahap 3)
+        viewModelScope.launch {
+            settingsRepository.spotifyAuth.collect { auth ->
+                _spotifyAccountState.update { state ->
+                    state.copy(
+                        isConnected = auth.isConnected,
+                        profile = if (auth.isConnected && auth.userId.isNotBlank()) {
+                            com.example.musikku.data.repository.SpotifyUserProfile(
+                                id = auth.userId,
+                                displayName = auth.userName.ifBlank { "Pengguna Spotify" },
+                                avatarUrl = auth.userAvatar.ifBlank { null }
+                            )
+                        } else null
+                    )
+                }
+                if (auth.isConnected && auth.accessToken.isNotBlank()) {
+                    refreshSpotifyProfileAndPlaylists(auth.accessToken)
+                }
             }
         }
 
@@ -266,15 +325,35 @@ class LibraryViewModel(
         }
     }
 
-    fun loadPopularJamendo() {
+    fun loadPopularJamendo(forceRefresh: Boolean = false) {
+        if (!forceRefresh && _jamendoState.value.popularTracks.isNotEmpty()) {
+            _jamendoState.update {
+                it.copy(
+                    query = "",
+                    results = emptyList(),
+                    isSearching = false,
+                    errorMessage = null
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            _jamendoState.update { it.copy(isSearching = true, errorMessage = null) }
+            _jamendoState.update {
+                it.copy(
+                    query = "",
+                    results = emptyList(),
+                    isSearching = true,
+                    errorMessage = null
+                )
+            }
             val result = jamendoRepository.getPopularTracks()
             result.onSuccess { tracks ->
                 android.util.Log.d("MusikKuJamendo", "Loaded popular tracks: ${tracks.size}")
                 _jamendoState.update {
                     it.copy(
                         popularTracks = tracks,
+                        query = "",
+                        results = emptyList(),
                         isSearching = false,
                         errorMessage = null
                     )
@@ -283,6 +362,7 @@ class LibraryViewModel(
                 android.util.Log.e("MusikKuJamendo", "Failed to load popular tracks", error)
                 _jamendoState.update {
                     it.copy(
+                        query = "",
                         isSearching = false,
                         errorMessage = "Gagal memuat lagu populer: ${error.localizedMessage ?: "Periksa koneksi internet"}"
                     )
@@ -291,10 +371,24 @@ class LibraryViewModel(
         }
     }
 
+    fun clearJamendoSearch() {
+        _jamendoState.update {
+            it.copy(
+                query = "",
+                results = emptyList(),
+                isSearching = false,
+                errorMessage = null
+            )
+        }
+        if (_jamendoState.value.popularTracks.isEmpty()) {
+            loadPopularJamendo()
+        }
+    }
+
     fun searchJamendo(query: String) {
         val queryClean = query.trim()
         if (queryClean.isBlank()) {
-            loadPopularJamendo()
+            clearJamendoSearch()
             return
         }
 
@@ -334,15 +428,35 @@ class LibraryViewModel(
         }
     }
 
-    fun loadTrendingYouTube() {
+    fun loadTrendingYouTube(forceRefresh: Boolean = false) {
+        if (!forceRefresh && _youTubeState.value.trendingTracks.isNotEmpty()) {
+            _youTubeState.update {
+                it.copy(
+                    query = "",
+                    results = emptyList(),
+                    isSearching = false,
+                    errorMessage = null
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            _youTubeState.update { it.copy(isSearching = true, errorMessage = null) }
+            _youTubeState.update {
+                it.copy(
+                    query = "",
+                    results = emptyList(),
+                    isSearching = true,
+                    errorMessage = null
+                )
+            }
             val result = youTubeMusicRepository.getTrendingMusic()
             result.onSuccess { tracks ->
                 android.util.Log.d("MusikKuYouTube", "Loaded trending tracks: ${tracks.size}")
                 _youTubeState.update {
                     it.copy(
                         trendingTracks = tracks,
+                        query = "",
+                        results = emptyList(),
                         isSearching = false,
                         errorMessage = null
                     )
@@ -351,6 +465,7 @@ class LibraryViewModel(
                 android.util.Log.e("MusikKuYouTube", "Failed to load trending", error)
                 _youTubeState.update {
                     it.copy(
+                        query = "",
                         isSearching = false,
                         errorMessage = "Gagal memuat musik trending: ${error.localizedMessage ?: "Periksa koneksi internet"}"
                     )
@@ -359,16 +474,53 @@ class LibraryViewModel(
         }
     }
 
+    fun clearYouTubeSearch() {
+        _youTubeState.update {
+            it.copy(
+                query = "",
+                results = emptyList(),
+                isSearching = false,
+                errorMessage = null
+            )
+        }
+        if (_youTubeState.value.trendingTracks.isEmpty()) {
+            loadTrendingYouTube()
+        }
+    }
+
+    fun resetExploreToTrending() {
+        loadTrendingYouTube(forceRefresh = false)
+        loadPopularJamendo(forceRefresh = false)
+    }
+
+    suspend fun searchYouTubeForCommunity(query: String): List<com.example.musikku.data.remote.youtube.YouTubeSearchItemDto> {
+        return youTubeMusicRepository.searchMusic(query.trim()).getOrNull() ?: emptyList()
+    }
+
     fun searchYouTube(query: String) {
         val queryClean = query.trim()
         if (queryClean.isBlank()) {
-            loadTrendingYouTube()
+            clearYouTubeSearch()
+            return
+        }
+
+        // Jika input adalah tautan Spotify (Track/Album/Playlist), alihkan ke import Spotify otomatis
+        if (isSpotifyLink(queryClean)) {
+            importSpotifyLink(queryClean)
             return
         }
 
         viewModelScope.launch {
             settingsRepository.addRecentSearch(queryClean)
-            _youTubeState.update { it.copy(query = queryClean, isSearching = true, errorMessage = null) }
+            _youTubeState.update {
+                it.copy(
+                    query = queryClean,
+                    isSearching = true,
+                    isLoadingMore = false,
+                    hasMoreResults = true,
+                    errorMessage = null
+                )
+            }
             val result = youTubeMusicRepository.searchMusic(queryClean)
             result.onSuccess { tracks ->
                 android.util.Log.d("MusikKuYouTube", "Search for '$queryClean' returned: ${tracks.size} tracks")
@@ -376,6 +528,8 @@ class LibraryViewModel(
                     it.copy(
                         results = tracks,
                         isSearching = false,
+                        isLoadingMore = false,
+                        hasMoreResults = tracks.isNotEmpty() && youTubeMusicRepository.hasMore(),
                         errorMessage = if (tracks.isEmpty()) "Tidak ada hasil untuk \"$queryClean\"" else null
                     )
                 }
@@ -384,10 +538,412 @@ class LibraryViewModel(
                 _youTubeState.update {
                     it.copy(
                         isSearching = false,
+                        isLoadingMore = false,
+                        hasMoreResults = false,
                         errorMessage = "Gagal mencari di YouTube: ${error.localizedMessage ?: "Periksa koneksi internet"}"
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Memuat halaman lagu berikutnya dari YouTube (Infinite Scroll).
+     */
+    fun loadMoreYouTube() {
+        val currentState = _youTubeState.value
+        if (currentState.isSearching || currentState.isLoadingMore || !currentState.hasMoreResults || currentState.query.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            _youTubeState.update { it.copy(isLoadingMore = true) }
+            val result = youTubeMusicRepository.loadMoreSearchResults()
+            result.onSuccess { newTracks ->
+                android.util.Log.d("MusikKuYouTube", "Load more returned: ${newTracks.size} new tracks")
+                _youTubeState.update { state ->
+                    val existingIds = state.results.map { it.videoId }.toSet()
+                    val filteredNew = newTracks.filterNot { existingIds.contains(it.videoId) }
+                    state.copy(
+                        results = state.results + filteredNew,
+                        isLoadingMore = false,
+                        hasMoreResults = filteredNew.isNotEmpty() && youTubeMusicRepository.hasMore()
+                    )
+                }
+            }.onFailure {
+                _youTubeState.update { it.copy(isLoadingMore = false, hasMoreResults = false) }
+            }
+        }
+    }
+
+    /**
+     * Memeriksa apakah input adalah tautan Spotify yang valid.
+     */
+    fun isSpotifyLink(input: String): Boolean {
+        return spotifyRepository?.isSpotifyLink(input) == true
+    }
+
+    /**
+     * Mengimpor metadata dari link Spotify publik (Lagu, Album, Playlist)
+     * dan menampilkan hasilnya di SpotifyImportSheet.
+     */
+    fun importSpotifyLink(urlOrUri: String) {
+        val repo = spotifyRepository ?: return
+        val trimmed = urlOrUri.trim()
+        if (trimmed.isBlank()) return
+
+        viewModelScope.launch {
+            _spotifyImportState.update { it.copy(isImporting = true, errorMessage = null) }
+            val result = repo.fetchSpotifyMetadata(trimmed)
+            result.onSuccess { importResult ->
+                _spotifyImportState.update {
+                    it.copy(
+                        isImporting = false,
+                        result = importResult,
+                        errorMessage = null
+                    )
+                }
+            }.onFailure { error ->
+                _spotifyImportState.update {
+                    it.copy(
+                        isImporting = false,
+                        errorMessage = error.localizedMessage ?: "Gagal mengimpor link Spotify"
+                    )
+                }
+                musicController.postUserMessage("Gagal impor Spotify: ${error.localizedMessage}")
+            }
+        }
+    }
+
+    fun clearSpotifyImport() {
+        _spotifyImportState.update { SpotifyImportState() }
+    }
+
+    fun playSpotifyTrack(track: com.example.musikku.data.repository.SpotifyTrack) {
+        val songId = ((("spotify_" + track.id).hashCode().toLong() and 0x7FFFFFFF) or 0x50000000L)
+        val songEntity = SongEntity(
+            id = songId,
+            title = track.title,
+            artist = track.artist,
+            album = "Spotify",
+            duration = track.durationMs,
+            albumArtUri = track.coverArtUri.orEmpty(),
+            contentUri = "spotify:${track.id}",
+            source = "YOUTUBE",
+            dateAdded = System.currentTimeMillis() / 1000,
+            size = 0L,
+            isFavorite = false,
+            filePath = ""
+        )
+        val allTracks = _spotifyImportState.value.result?.tracks
+        if (!allTracks.isNullOrEmpty() && allTracks.any { it.id == track.id }) {
+            playAllSpotifyTracks(allTracks, allTracks.indexOfFirst { it.id == track.id })
+        } else {
+            musicController.playSongs(listOf(songEntity), 0)
+        }
+    }
+
+    fun playAllSpotifyTracks(tracks: List<com.example.musikku.data.repository.SpotifyTrack>, startIndex: Int = 0) {
+        if (tracks.isEmpty()) return
+        val albumName = _spotifyImportState.value.result?.title?.ifBlank { "Spotify" } ?: "Spotify"
+        val songEntities = tracks.map { track ->
+            val songId = ((("spotify_" + track.id).hashCode().toLong() and 0x7FFFFFFF) or 0x50000000L)
+            SongEntity(
+                id = songId,
+                title = track.title,
+                artist = track.artist,
+                album = albumName,
+                duration = track.durationMs,
+                albumArtUri = track.coverArtUri.orEmpty(),
+                contentUri = "spotify:${track.id}",
+                source = "YOUTUBE",
+                dateAdded = System.currentTimeMillis() / 1000,
+                size = 0L,
+                isFavorite = false,
+                filePath = ""
+            )
+        }
+        val validIndex = startIndex.coerceIn(songEntities.indices)
+        musicController.playSongs(songEntities, validIndex)
+    }
+
+    fun shuffleAllSpotifyTracks(tracks: List<com.example.musikku.data.repository.SpotifyTrack>) {
+        if (tracks.isEmpty()) return
+        playAllSpotifyTracks(tracks.shuffled(), 0)
+    }
+
+    /**
+     * Memutar langsung lagu pertama dari Chart/Playlist Spotify dari Beranda dan membuka sheet.
+     */
+    fun playSpotifyPlaylistDirectly(playlistId: String) {
+        val repo = spotifyRepository ?: return
+        viewModelScope.launch {
+            _spotifyImportState.update { it.copy(isImporting = true, errorMessage = null) }
+            val result = repo.fetchSpotifyMetadata("https://open.spotify.com/playlist/$playlistId")
+            result.onSuccess { importResult ->
+                _spotifyImportState.update {
+                    it.copy(
+                        isImporting = false,
+                        result = importResult,
+                        errorMessage = null
+                    )
+                }
+                if (importResult.tracks.isNotEmpty()) {
+                    playSpotifyTrack(importResult.tracks.first())
+                }
+            }.onFailure { error ->
+                _spotifyImportState.update {
+                    it.copy(
+                        isImporting = false,
+                        errorMessage = error.localizedMessage ?: "Gagal memuat chart Spotify"
+                    )
+                }
+                musicController.postUserMessage("Gagal memuat chart Spotify: ${error.localizedMessage}")
+            }
+        }
+    }
+
+    fun saveSpotifyPlaylistToLibrary(result: com.example.musikku.data.repository.SpotifyImportResult) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val playlistName = result.title.ifBlank { "Playlist Spotify" }
+                val playlistId = repository.createPlaylist(playlistName)
+
+                var count = 0
+                for (track in result.tracks) {
+                    val songId = ((("spotify_" + track.id).hashCode().toLong() and 0x7FFFFFFF) or 0x50000000L)
+                    val songEntity = SongEntity(
+                        id = songId,
+                        title = track.title,
+                        artist = track.artist,
+                        album = result.title,
+                        duration = track.durationMs,
+                        albumArtUri = track.coverArtUri.orEmpty(),
+                        contentUri = "spotify:${track.id}",
+                        source = "YOUTUBE",
+                        dateAdded = System.currentTimeMillis() / 1000,
+                        size = 0L,
+                        isFavorite = false,
+                        filePath = ""
+                    )
+                    repository.saveOnlineSongForPlaylist(songEntity)
+                    repository.addSongToPlaylist(playlistId, songId)
+                    count++
+                }
+                musicController.postUserMessage("Playlist '$playlistName' berhasil disimpan ($count lagu)")
+            } catch (e: Exception) {
+                musicController.postUserMessage("Gagal menyimpan playlist: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    // ─── Metode Akun & Sinkronisasi Spotify (Tahap 3) ────────────────────────
+
+    fun startSpotifyLogin(context: Context, customClientId: String = "") {
+        val repo = spotifyRepository ?: return
+        val clientId = customClientId.trim()
+        if (clientId.isBlank()) {
+            musicController.postUserMessage("Silakan isi Spotify Client ID terlebih dahulu, atau gunakan tab 'Token Cepat'.")
+            return
+        }
+        viewModelScope.launch {
+            val verifier = repo.generateCodeVerifier()
+            val challenge = repo.generateCodeChallenge(verifier)
+            settingsRepository.saveSpotifyCodeVerifier(verifier, clientId)
+
+            val authUri = repo.buildAuthUri(clientId = clientId, codeChallenge = challenge)
+            val intent = Intent(Intent.ACTION_VIEW, authUri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            try {
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                musicController.postUserMessage("Tidak dapat membuka browser: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun handleSpotifyAuthCallback(code: String) {
+        val repo = spotifyRepository ?: return
+        viewModelScope.launch {
+            _spotifyAccountState.update { it.copy(isLoading = true, errorMessage = null) }
+            val authData = settingsRepository.spotifyAuth.first()
+            val verifier = authData.codeVerifier
+            val clientId = authData.clientId.ifBlank { "0d3c01c6db9848248cbb5920ba8f3ce8" }
+
+            val tokenResult = repo.exchangeCodeForToken(code = code, verifier = verifier, clientId = clientId)
+            tokenResult.onSuccess { (accessToken, refreshToken) ->
+                val profileResult = repo.fetchCurrentUserProfile(accessToken)
+                val profile = profileResult.getOrNull()
+                settingsRepository.saveSpotifyAuth(
+                    accessToken = accessToken,
+                    refreshToken = refreshToken.orEmpty(),
+                    userId = profile?.id.orEmpty(),
+                    userName = profile?.displayName.orEmpty(),
+                    userAvatar = profile?.avatarUrl.orEmpty()
+                )
+                _spotifyAccountState.update {
+                    it.copy(
+                        isConnected = true,
+                        isLoading = false,
+                        profile = profile,
+                        errorMessage = null
+                    )
+                }
+                musicController.postUserMessage("Akun Spotify berhasil terhubung: ${profile?.displayName ?: ""}")
+                refreshSpotifyProfileAndPlaylists(accessToken)
+            }.onFailure { err ->
+                _spotifyAccountState.update { it.copy(isLoading = false, errorMessage = err.localizedMessage) }
+                musicController.postUserMessage("Gagal menghubungkan Spotify: ${err.localizedMessage}")
+            }
+        }
+    }
+
+    fun connectSpotifyWithAccessToken(token: String) {
+        val repo = spotifyRepository ?: return
+        val cleanToken = token.trim()
+        if (cleanToken.isBlank()) return
+
+        viewModelScope.launch {
+            _spotifyAccountState.update { it.copy(isLoading = true, errorMessage = null) }
+            val profileResult = repo.fetchCurrentUserProfile(cleanToken)
+            profileResult.onSuccess { profile ->
+                settingsRepository.saveSpotifyAuth(
+                    accessToken = cleanToken,
+                    userId = profile.id,
+                    userName = profile.displayName,
+                    userAvatar = profile.avatarUrl.orEmpty()
+                )
+                _spotifyAccountState.update {
+                    it.copy(
+                        isConnected = true,
+                        isLoading = false,
+                        profile = profile,
+                        errorMessage = null
+                    )
+                }
+                musicController.postUserMessage("Akun Spotify berhasil terhubung: ${profile.displayName}")
+                refreshSpotifyProfileAndPlaylists(cleanToken)
+            }.onFailure { err ->
+                _spotifyAccountState.update { it.copy(isLoading = false, errorMessage = err.localizedMessage) }
+                musicController.postUserMessage("Token Spotify tidak valid atau telah kedaluwarsa")
+            }
+        }
+    }
+
+    fun refreshSpotifyProfileAndPlaylists(explicitToken: String? = null) {
+        val repo = spotifyRepository ?: return
+        viewModelScope.launch {
+            val token = explicitToken ?: settingsRepository.spotifyAuth.first().accessToken
+            if (token.isBlank()) return@launch
+
+            _spotifyAccountState.update { it.copy(isLoading = true) }
+            val profileResult = repo.fetchCurrentUserProfile(token)
+            val playlistsResult = repo.fetchCurrentUserPlaylists(token)
+
+            _spotifyAccountState.update { state ->
+                state.copy(
+                    isLoading = false,
+                    profile = profileResult.getOrNull() ?: state.profile,
+                    userPlaylists = playlistsResult.getOrNull() ?: state.userPlaylists
+                )
+            }
+        }
+    }
+
+    fun syncSpotifyLikedSongs() {
+        val repo = spotifyRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val token = settingsRepository.spotifyAuth.first().accessToken
+            if (token.isBlank()) {
+                musicController.postUserMessage("Silakan hubungkan akun Spotify terlebih dahulu.")
+                return@launch
+            }
+
+            _spotifyAccountState.update { it.copy(isSyncingLikedSongs = true) }
+            val result = repo.fetchCurrentUserLikedSongs(token, limit = 50)
+            _spotifyAccountState.update { it.copy(isSyncingLikedSongs = false) }
+
+            result.onSuccess { tracks ->
+                if (tracks.isEmpty()) {
+                    musicController.postUserMessage("Tidak ada lagu di Liked Songs akun Spotify Anda.")
+                    return@onSuccess
+                }
+
+                val playlistId = repository.createPlaylist("Lagu Disukai Spotify")
+                var savedCount = 0
+                for (track in tracks) {
+                    val songId = ((("spotify_liked_" + track.id).hashCode().toLong() and 0x7FFFFFFF) or 0x51000000L)
+                    val songEntity = SongEntity(
+                        id = songId,
+                        title = track.title,
+                        artist = track.artist,
+                        album = "Spotify Liked Songs",
+                        duration = track.durationMs,
+                        albumArtUri = track.coverArtUri.orEmpty(),
+                        contentUri = "spotify:${track.id}",
+                        source = "YOUTUBE",
+                        dateAdded = System.currentTimeMillis() / 1000,
+                        size = 0L,
+                        isFavorite = true,
+                        filePath = ""
+                    )
+                    repository.saveOnlineSongForPlaylist(songEntity)
+                    repository.addSongToPlaylist(playlistId, songId)
+                    savedCount++
+                }
+                musicController.postUserMessage("$savedCount Lagu Disukai Spotify berhasil disinkronkan!")
+            }.onFailure { err ->
+                musicController.postUserMessage("Gagal sinkronisasi Liked Songs: ${err.localizedMessage}")
+            }
+        }
+    }
+
+    fun importSpotifyUserPlaylist(playlist: com.example.musikku.data.repository.SpotifyUserPlaylist) {
+        val repo = spotifyRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val token = settingsRepository.spotifyAuth.first().accessToken
+            if (token.isBlank()) return@launch
+
+            _spotifyAccountState.update { it.copy(syncingPlaylistId = playlist.id) }
+            val result = repo.fetchUserPlaylistTracks(token, playlist.id)
+            _spotifyAccountState.update { it.copy(syncingPlaylistId = null) }
+
+            result.onSuccess { tracks ->
+                val targetPlaylistId = repository.createPlaylist(playlist.name)
+                var count = 0
+                for (track in tracks) {
+                    val songId = ((("spotify_user_pl_" + track.id).hashCode().toLong() and 0x7FFFFFFF) or 0x52000000L)
+                    val songEntity = SongEntity(
+                        id = songId,
+                        title = track.title,
+                        artist = track.artist,
+                        album = playlist.name,
+                        duration = track.durationMs,
+                        albumArtUri = track.coverArtUri.orEmpty(),
+                        contentUri = "spotify:${track.id}",
+                        source = "YOUTUBE",
+                        dateAdded = System.currentTimeMillis() / 1000,
+                        size = 0L,
+                        isFavorite = false,
+                        filePath = ""
+                    )
+                    repository.saveOnlineSongForPlaylist(songEntity)
+                    repository.addSongToPlaylist(targetPlaylistId, songId)
+                    count++
+                }
+                musicController.postUserMessage("Playlist '${playlist.name}' berhasil diimpor ($count lagu)!")
+            }.onFailure { err ->
+                musicController.postUserMessage("Gagal mengimpor playlist: ${err.localizedMessage}")
+            }
+        }
+    }
+
+    fun disconnectSpotify() {
+        viewModelScope.launch {
+            settingsRepository.clearSpotifyAuth()
+            _spotifyAccountState.value = SpotifyAccountState()
+            musicController.postUserMessage("Akun Spotify berhasil diputuskan.")
         }
     }
 
@@ -575,6 +1131,25 @@ class LibraryViewModel(
         }
     }
 
+    /** Pembaruan Profil Pengguna (Gaya Spotify) */
+    fun updateUserName(name: String) {
+        viewModelScope.launch {
+            settingsRepository.setUserName(name)
+        }
+    }
+
+    fun updateUserAvatarUri(uri: String) {
+        viewModelScope.launch {
+            settingsRepository.setUserAvatarUri(uri)
+        }
+    }
+
+    fun updateUserBio(bio: String) {
+        viewModelScope.launch {
+            settingsRepository.setUserBio(bio)
+        }
+    }
+
     /**
      * Atur Sleep Timer dalam menit (15, 30, 45, 60, dll).
      */
@@ -596,48 +1171,81 @@ class LibraryViewModel(
 
     // ─── Playback & Antrean ─────────────────────────────────────────────────────
 
+    /**
+     * Menyelesaikan stream audio YouTube untuk lagu online (misal dari Spotify atau YouTube expired).
+     * Jika sukses, mengembalikan SongEntity dengan contentUri siap streaming dan menyimpan ke Room.
+     */
+    suspend fun resolveSongIfNeeded(song: SongEntity): SongEntity? {
+        if (song.source != "YOUTUBE") return song
+
+        val isExpired = try {
+            val exp = Uri.parse(song.contentUri).getQueryParameter("expire")?.toLongOrNull()
+            exp != null && (System.currentTimeMillis() / 1000L) >= (exp - 60)
+        } catch (_: Exception) {
+            false
+        }
+        val isSpotifyTrack = song.contentUri.startsWith("spotify:")
+        val isBlankUri = song.contentUri.isBlank()
+
+        if (!isExpired && !isSpotifyTrack && !isBlankUri && song.contentUri.startsWith("http")) {
+            return song
+        }
+
+        val trackDto = song.toYouTubeSearchItemDto()
+        val targetDto = if (trackDto.videoId.isNotBlank()) {
+            trackDto
+        } else {
+            val artistClean = if (song.artist.isNotBlank() && song.artist != "Artis Spotify" && song.artist != "Artis Tidak Diketahui") {
+                song.artist
+            } else ""
+            val query1 = if (artistClean.isNotBlank()) "$artistClean - ${song.title}" else song.title
+            var found = youTubeMusicRepository.searchMusic(query1).getOrNull()?.firstOrNull()
+            if (found == null && artistClean.isNotBlank()) {
+                val query2 = "${song.title} $artistClean"
+                found = youTubeMusicRepository.searchMusic(query2).getOrNull()?.firstOrNull()
+            }
+            found
+        }
+
+        if (targetDto == null) {
+            android.util.Log.e("LibraryViewModel", "Tidak dapat menemukan video YouTube untuk '${song.title}'")
+            return null
+        }
+
+        val result = youTubeMusicRepository.resolveAudioStream(targetDto)
+        return result.map { freshSong ->
+            val mergedSong = freshSong.copy(
+                id = song.id,
+                title = song.title,
+                artist = if (song.artist.isNotBlank() && song.artist != "Artis Spotify" && song.artist != "Artis Tidak Diketahui") song.artist else freshSong.artist,
+                album = song.album.ifBlank { freshSong.album },
+                albumArtUri = song.albumArtUri.ifBlank { freshSong.albumArtUri },
+                isFavorite = song.isFavorite
+            )
+            repository.saveOnlineSongForPlaylist(mergedSong)
+            mergedSong
+        }.getOrNull()
+    }
+
     fun playSong(song: SongEntity, customQueue: List<SongEntity>? = null) {
-        val playlist = customQueue ?: when (uiState.value.selectedTab) {
-            LibraryTab.SONGS -> uiState.value.songs
-            LibraryTab.FAVORITES -> uiState.value.favoriteSongs
-            LibraryTab.PLAYLISTS, LibraryTab.JAMENDO -> uiState.value.songs
-        }
-        val startIndex = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-
-        // Jika lagu YouTube streaming diputar dari Favorit/Playlist dan URL stream sudah expired, refresh otomatis
-        if (song.source == "YOUTUBE") {
-            val isExpired = try {
-                val exp = Uri.parse(song.contentUri).getQueryParameter("expire")?.toLongOrNull()
-                exp != null && (System.currentTimeMillis() / 1000L) >= (exp - 60)
-            } catch (_: Exception) {
-                false
-            }
-            if (isExpired || song.contentUri.isBlank()) {
-                viewModelScope.launch {
-                    val trackDto = song.toYouTubeSearchItemDto()
-                    if (trackDto.videoId.isNotBlank()) {
-                        val result = youTubeMusicRepository.resolveAudioStream(trackDto)
-                        result.onSuccess { freshSong ->
-                            repository.saveOnlineSongForPlaylist(freshSong.copy(isFavorite = song.isFavorite))
-                            val updatedPlaylist = playlist.map { if (it.id == freshSong.id) freshSong else it }
-                            musicController.playSongs(updatedPlaylist, startIndex)
-                        }.onFailure {
-                            musicController.playSongs(playlist, startIndex)
-                        }
-                        return@launch
-                    }
-                    musicController.playSongs(playlist, startIndex)
-                }
-                return
+        val playlist = customQueue ?: run {
+            when {
+                uiState.value.favoriteSongs.any { it.id == song.id } -> uiState.value.favoriteSongs
+                uiState.value.songs.any { it.id == song.id } -> uiState.value.songs
+                else -> listOf(song)
             }
         }
+        val foundIndex = playlist.indexOfFirst { it.id == song.id }
+        val finalPlaylist = if (foundIndex >= 0) playlist else listOf(song)
+        val startIndex = if (foundIndex >= 0) foundIndex else 0
 
-        musicController.playSongs(playlist, startIndex)
+        musicController.playSongs(finalPlaylist, startIndex)
     }
 
     fun playAll(songs: List<SongEntity>, startIndex: Int = 0) {
         if (songs.isNotEmpty()) {
-            musicController.playSongs(songs, startIndex)
+            val validIndex = startIndex.coerceIn(songs.indices)
+            musicController.playSongs(songs, validIndex)
         }
     }
 
@@ -779,7 +1387,9 @@ class LibraryViewModel(
         private val lyricsRepository: com.example.musikku.data.repository.LyricsRepository,
         private val settingsRepository: SettingsRepository,
         private val networkMonitor: NetworkMonitor,
-        private val musicController: MusicController
+        private val musicController: MusicController,
+        private val listeningStatsRepository: com.example.musikku.data.repository.ListeningStatsRepository? = null,
+        private val spotifyRepository: com.example.musikku.data.repository.SpotifyRepository? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -790,7 +1400,9 @@ class LibraryViewModel(
                 lyricsRepository = lyricsRepository,
                 settingsRepository = settingsRepository,
                 networkMonitor = networkMonitor,
-                musicController = musicController
+                musicController = musicController,
+                listeningStatsRepository = listeningStatsRepository,
+                spotifyRepository = spotifyRepository
             ) as T
         }
     }

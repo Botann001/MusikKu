@@ -35,6 +35,7 @@ fun SongEntity.toYouTubeSearchItemDto(): YouTubeSearchItemDto {
         videoId = vid,
         title = title,
         author = artist,
+        videoThumbnails = if (albumArtUri.isNotBlank()) listOf(YouTubeThumbnailDto(url = albumArtUri)) else null,
         lengthSeconds = duration / 1000L
     )
 }

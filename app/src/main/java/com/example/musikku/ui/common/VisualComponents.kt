@@ -22,15 +22,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import kotlin.math.abs
 
 /**
@@ -163,5 +171,69 @@ fun AlbumArtPlaceholder(
             tint = Color.White.copy(alpha = 0.95f),
             modifier = Modifier.size(iconSize)
         )
+    }
+}
+
+/**
+ * Komponen gambar cover album universal dengan fallback otomatis ke AlbumArtPlaceholder
+ * jika URI kosong atau jika gambar gagal dimuat (misalnya MediaStore albumart yang tidak ada).
+ */
+@Composable
+fun SongAlbumArt(
+    albumArtUri: String,
+    title: String,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 22.dp,
+    showConcentricRings: Boolean = false,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    var isError by remember(albumArtUri) { mutableStateOf(false) }
+    val showPlaceholder = albumArtUri.isBlank() || isError
+
+    if (!showPlaceholder) {
+        AsyncImage(
+            model = albumArtUri,
+            contentDescription = null,
+            contentScale = contentScale,
+            onError = { isError = true },
+            onSuccess = { isError = false },
+            modifier = modifier
+        )
+    } else {
+        AlbumArtPlaceholder(
+            seed = title,
+            modifier = modifier,
+            iconSize = iconSize,
+            showConcentricRings = showConcentricRings
+        )
+    }
+}
+
+/**
+ * NestedScrollConnection untuk mencegah ModalBottomSheet bergoyang / bergetar ke bawah saat
+ * pengguna men-scroll daftar LazyColumn ke atas (swipe ke bawah).
+ * Mengonsumsi sisa scroll vertikal (over-scroll) sehingga tidak diteruskan ke BottomSheet.
+ */
+@Composable
+fun rememberSheetScrollBlocker(): NestedScrollConnection {
+    return remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // Tangkap leftover vertical scroll sehingga ModalBottomSheet tidak ikut bergeser ke bawah
+                return if (available.y != 0f) Offset(0f, available.y) else Offset.Zero
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                // Tangkap leftover vertical velocity saat fling
+                return if (available.y != 0f) Velocity(0f, available.y) else Velocity.Zero
+            }
+        }
     }
 }

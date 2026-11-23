@@ -31,9 +31,12 @@ class AppContainer(context: Context) {
             AppDatabase.MIGRATION_2_4,
             AppDatabase.MIGRATION_1_5,
             AppDatabase.MIGRATION_2_5,
-            AppDatabase.MIGRATION_3_5
+            AppDatabase.MIGRATION_3_5,
+            AppDatabase.MIGRATION_5_6
         )
         .build()
+
+    val listeningStatsRepository = com.example.musikku.data.repository.ListeningStatsRepository(database.listeningStatsDao())
 
     val settingsRepository = com.example.musikku.data.preferences.SettingsRepository(context.applicationContext)
 
@@ -51,7 +54,10 @@ class AppContainer(context: Context) {
     /** Alias songRepository sesuai kontrak spesifikasi */
     val songRepository: MusicRepository get() = musicRepository
 
-    val musicController = MusicController(context.applicationContext)
+    val musicController = MusicController(
+        context = context.applicationContext,
+        listeningStatsRepository = listeningStatsRepository
+    )
     /** Alias playerController sesuai kontrak spesifikasi */
     val playerController: MusicController get() = musicController
 
@@ -115,6 +121,11 @@ class AppContainer(context: Context) {
 
     val lyricsRepository = com.example.musikku.data.repository.LyricsRepository(
         apiService = lrcLibApiService
+    )
+
+    val spotifyRepository = com.example.musikku.data.repository.SpotifyRepository(
+        okHttpClient = okHttpClient,
+        youTubeMusicRepository = youTubeMusicRepository
     )
 
     init {

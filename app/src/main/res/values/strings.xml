@@ -4,8 +4,12 @@
     <string name="playback_channel_name">Pemutaran Musik</string>
 
     <!-- Navigation -->
-    <string name="nav_library">Perpustakaan</string>
-    <string name="nav_explore">Jelajahi</string>
+    <string name="nav_beranda">Beranda</string>
+    <string name="nav_pustaka">Pustaka</string>
+    <string name="nav_home">Beranda</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_library">Pustaka</string>
+    <string name="nav_explore">Search</string>
     <string name="nav_settings">Pengaturan</string>
 
     <!-- Settings -->
@@ -55,4 +59,56 @@
     <string name="explore_jamendo">Jamendo</string>
     <string name="explore_youtube">YouTube</string>
     <string name="explore_search_hint">Cari musik…</string>
+
+    <!-- Pustaka Extended -->
+    <string name="library_albums">Album</string>
+    <string name="library_downloaded">Diunduh</string>
+    <string name="library_top50">Teratas Saya 50</string>
+    <string name="library_cache">Tersimpan di Cache</string>
+    <string name="library_uploaded">Diunggah</string>
+    <string name="library_local">Local</string>
+    <string name="library_your_playlists">Daftar Putar Kamu</string>
+    <string name="library_sort_date_added">Tanggal ditambahkan</string>
+    <string name="library_sort_name">Nama</string>
+    <string name="library_sort_date_modified">Tanggal diperbarui</string>
+
+    <!-- Explore Extended -->
+    <string name="explore_streaming_subtitle">STREAMING JUTAAN MUSIK ONLINE</string>
+    <string name="explore_jamendo_subtitle">MUSIK LEGAL BEBAS ROYALTI</string>
+    <string name="explore_import_spotify">Impor Link Spotify (Lagu / Playlist)</string>
+    <string name="explore_recent_searches">Pencarian Terakhir</string>
+    <string name="explore_clear_all">Hapus Semua</string>
+    <string name="explore_trending">Trending</string>
+    <string name="explore_popular_trending">Lagu Populer &amp; Trending</string>
+
+    <!-- Beranda Extended -->
+    <string name="home_community_playlists">Trending community playlists</string>
+    <string name="home_spotify_charts">Spotify Charts</string>
+    <string name="home_spotify_charts_desc">Tangga lagu &amp; trending</string>
+    <string name="home_account">Akun</string>
+    <string name="home_import">Impor</string>
+    <string name="home_your_collection">Koleksi Kamu</string>
+    <string name="home_create_new">Buat Baru</string>
+
+    <!-- Profile Drawer & Stats Extended -->
+    <string name="profile_view_profile">Lihat profil</string>
+    <string name="profile_edit_name">Atur nama profil</string>
+    <string name="profile_listening_stats">Statistik mendengarkan</string>
+    <string name="profile_recently_played">Baru Diputar</string>
+    <string name="profile_recently_played_desc">Buka daftar lagu terakhir</string>
+    <string name="profile_settings_privacy">Pengaturan dan privasi</string>
+    <string name="profile_settings_privacy_desc">Tema, bahasa, dan unduhan</string>
+    <string name="stats_title">Statistik Mendengarkan</string>
+    <string name="stats_time_section">WAKTU MENDENGARKAN MUSIK</string>
+    <string name="stats_this_week">Minggu Ini</string>
+    <string name="stats_this_month">Bulan Ini</string>
+    <string name="stats_this_year">Tahun Ini</string>
+    <string name="stats_accumulation_month">Akumulasi pemutaran bulan ini</string>
+    <string name="stats_total_year">Total pemutaran musik tahun ini</string>
+    <string name="stats_collection_section">KOLEKSI &amp; INTERAKSI</string>
+    <string name="stats_music_collection">Koleksi Musik</string>
+    <string name="stats_music_collection_desc">Lagu offline tersimpan di perangkat Anda</string>
+    <string name="stats_liked_songs">Lagu yang Disukai</string>
+    <string name="stats_liked_songs_desc">Lagu yang Anda beri tanda hati</string>
+    <string name="stats_close">Tutup</string>
 </resources>

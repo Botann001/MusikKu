@@ -49,7 +49,10 @@ data class PlaybackState(
  * Pengontrol pemutaran musik di sisi klien (UI / ViewModel).
  * Mengelola MediaController, antrean lagu, shuffle, repeat, seek, sleep timer, dan deteksi error.
  */
-class MusicController(private val context: Context) {
+class MusicController(
+    private val context: Context,
+    private val listeningStatsRepository: com.example.musikku.data.repository.ListeningStatsRepository? = null
+) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -68,6 +71,13 @@ class MusicController(private val context: Context) {
     private var currentPlaylist: List<SongEntity> = emptyList()
     private var progressJob: Job? = null
     private var sleepTimerJob: Job? = null
+    private var preResolveJob: Job? = null
+
+    /**
+     * Callback untuk menyelesaikan stream URL lagu (misal dari Spotify atau link YouTube kedaluwarsa)
+     * sebelum atau saat pemutaran.
+     */
+    var onResolveSongStream: (suspend (SongEntity) -> SongEntity?)? = null
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -81,10 +91,13 @@ class MusicController(private val context: Context) {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             val controller = mediaController
-            val index = controller?.currentMediaItemIndex ?: -1
             val songId = mediaItem?.mediaId?.toLongOrNull()
-            val song = currentPlaylist.getOrNull(index)
-                ?: currentPlaylist.firstOrNull { it.id == songId }
+            val foundIndex = if (songId != null) currentPlaylist.indexOfFirst { it.id == songId } else -1
+            val index = if (foundIndex >= 0) foundIndex else {
+                val next = _playbackState.value.currentIndex + 1
+                if (next in currentPlaylist.indices) next else 0
+            }
+            val song = currentPlaylist.getOrNull(index) ?: currentPlaylist.firstOrNull { it.id == songId }
 
             _playbackState.update {
                 it.copy(
@@ -93,6 +106,9 @@ class MusicController(private val context: Context) {
                     currentPosition = 0L,
                     duration = song?.duration ?: 0L
                 )
+            }
+            if (index >= 0) {
+                preResolveNextSong(index)
             }
         }
 
@@ -110,6 +126,16 @@ class MusicController(private val context: Context) {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             syncStateWithController()
+            if (playbackState == Player.STATE_ENDED) {
+                val nextIdx = _playbackState.value.currentIndex + 1
+                if (nextIdx in currentPlaylist.indices) {
+                    playQueueItem(nextIdx)
+                } else if (_playbackState.value.repeatMode == Player.REPEAT_MODE_ALL && currentPlaylist.isNotEmpty()) {
+                    playQueueItem(0)
+                } else {
+                    _playbackState.update { it.copy(isPlaying = false) }
+                }
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -131,14 +157,7 @@ class MusicController(private val context: Context) {
                 "Gagal memutar lagu: file tidak ditemukan atau jaringan bermasalah."
             }
             _userMessageEvent.tryEmit(msg)
-
-            val controller = mediaController
-            if (controller != null && controller.hasNextMediaItem()) {
-                controller.seekToNextMediaItem()
-                controller.play()
-            } else {
-                _playbackState.update { it.copy(isPlaying = false) }
-            }
+            _playbackState.update { it.copy(isPlaying = false) }
         }
     }
 
@@ -171,15 +190,47 @@ class MusicController(private val context: Context) {
         if (songs.isEmpty() || startIndex !in songs.indices) return
         currentPlaylist = songs
 
-        val controller = mediaController
-        if (controller != null) {
-            executePlay(controller, songs, startIndex)
+        val targetSong = songs[startIndex]
+        if (isPlayableDirectly(targetSong)) {
+            val controller = mediaController
+            if (controller != null) {
+                executePlay(controller, songs, startIndex)
+            } else {
+                controllerFuture?.addListener({
+                    mediaController?.let { c ->
+                        executePlay(c, songs, startIndex)
+                    }
+                }, ContextCompat.getMainExecutor(context))
+            }
         } else {
-            controllerFuture?.addListener({
-                mediaController?.let { c ->
-                    executePlay(c, songs, startIndex)
+            // Lagu target memerlukan resolusi stream (misal link Spotify atau YouTube expired)
+            _playbackState.update {
+                it.copy(
+                    currentSong = targetSong,
+                    queue = songs,
+                    currentIndex = startIndex,
+                    isPlaying = false
+                )
+            }
+            scope.launch {
+                val resolved = onResolveSongStream?.invoke(targetSong)
+                if (resolved != null && isPlayableDirectly(resolved)) {
+                    val updated = currentPlaylist.map { if (it.id == targetSong.id) resolved else it }
+                    currentPlaylist = updated
+                    val controller = mediaController
+                    if (controller != null) {
+                        executePlay(controller, updated, startIndex)
+                    } else {
+                        controllerFuture?.addListener({
+                            mediaController?.let { c ->
+                                executePlay(c, updated, startIndex)
+                            }
+                        }, ContextCompat.getMainExecutor(context))
+                    }
+                } else {
+                    _userMessageEvent.tryEmit("Audio untuk '${targetSong.title}' tidak dapat dimuat dari YouTube Music.")
                 }
-            }, ContextCompat.getMainExecutor(context))
+            }
         }
     }
 
@@ -192,18 +243,20 @@ class MusicController(private val context: Context) {
                 "Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus)."
             }
             _userMessageEvent.tryEmit(notFoundMsg)
-            if (songs.size > 1) {
-                val nextIndex = (startIndex + 1) % songs.size
-                val remainingSongs = songs.filterIndexed { idx, _ -> idx != startIndex }
-                if (remainingSongs.isNotEmpty()) {
-                    executePlay(controller, remainingSongs, nextIndex.coerceAtMost(remainingSongs.lastIndex))
-                    return
-                }
-            }
+            return
         }
 
-        val mediaItems = songs.map { it.toMediaItem() }
-        controller.setMediaItems(mediaItems, startIndex, 0L)
+        // Cek apakah ada lagu yang belum siap diputar (misal Spotify URI belum di-resolve)
+        // JANGAN pernah kirim URI 'spotify:...' ke ExoPlayer agar tidak memicu 'unknown protocol: spotify'
+        val hasUnresolved = songs.any { !isPlayableDirectly(it) }
+        val mediaItems = if (hasUnresolved) {
+            listOf(song.toMediaItem())
+        } else {
+            songs.map { it.toMediaItem() }
+        }
+        val playerStartIndex = if (hasUnresolved) 0 else startIndex
+
+        controller.setMediaItems(mediaItems, playerStartIndex, 0L)
         controller.prepare()
         controller.play()
         _playbackState.update {
@@ -218,30 +271,90 @@ class MusicController(private val context: Context) {
                 repeatMode = controller.repeatMode
             )
         }
+
+        preResolveNextSong(startIndex)
+    }
+
+    private fun preResolveNextSong(currentIndex: Int) {
+        preResolveJob?.cancel()
+        val nextIndex = currentIndex + 1
+        if (nextIndex !in currentPlaylist.indices) return
+        val nextSong = currentPlaylist[nextIndex]
+
+        if (isPlayableDirectly(nextSong)) {
+            val controller = mediaController ?: return
+            val currentExoCount = controller.mediaItemCount
+            val currentExoIndex = controller.currentMediaItemIndex
+            if (currentExoCount <= currentExoIndex + 1) {
+                controller.addMediaItem(nextSong.toMediaItem())
+            }
+            return
+        }
+
+        preResolveJob = scope.launch {
+            try {
+                val resolved = onResolveSongStream?.invoke(nextSong)
+                if (resolved != null && isPlayableDirectly(resolved)) {
+                    currentPlaylist = currentPlaylist.map { if (it.id == nextSong.id) resolved else it }
+                    _playbackState.update { it.copy(queue = currentPlaylist) }
+                    val controller = mediaController ?: return@launch
+                    val currentExoCount = controller.mediaItemCount
+                    val currentExoIndex = controller.currentMediaItemIndex
+                    if (currentExoCount <= currentExoIndex + 1) {
+                        controller.addMediaItem(resolved.toMediaItem())
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MusicController", "Pre-resolve gagal untuk '${nextSong.title}': ${e.message}")
+            }
+        }
     }
 
     /** Putar item tertentu dari antrean saat ini berdasarkan indeks. */
     fun playQueueItem(index: Int) {
-        val controller = mediaController ?: return
-        if (index in currentPlaylist.indices) {
-            val song = currentPlaylist[index]
-            if (!isFileAvailable(song)) {
-                val notFoundMsg = if (song.source == "YOUTUBE" || song.source == "JAMENDO" || song.contentUri.startsWith("http")) {
-                    "Lagu '${song.title}' tidak dapat dimuat dari internet."
-                } else {
-                    "Lagu '${song.title}' tidak ditemukan di HP (file telah dihapus)."
+        if (index !in currentPlaylist.indices) return
+        val song = currentPlaylist[index]
+
+        if (isPlayableDirectly(song)) {
+            val controller = mediaController ?: return
+            var playerItemIndex = -1
+            for (i in 0 until controller.mediaItemCount) {
+                if (controller.getMediaItemAt(i).mediaId == song.id.toString()) {
+                    playerItemIndex = i
+                    break
                 }
-                _userMessageEvent.tryEmit(notFoundMsg)
-                return
             }
-            controller.seekToDefaultPosition(index)
-            controller.play()
+            if (playerItemIndex >= 0) {
+                controller.seekToDefaultPosition(playerItemIndex)
+                controller.play()
+                _playbackState.update {
+                    it.copy(
+                        currentSong = song,
+                        currentIndex = index,
+                        isPlaying = true
+                    )
+                }
+                preResolveNextSong(index)
+            } else {
+                executePlay(controller, currentPlaylist, index)
+            }
+        } else {
             _playbackState.update {
                 it.copy(
                     currentSong = song,
                     currentIndex = index,
-                    isPlaying = true
+                    isPlaying = false
                 )
+            }
+            scope.launch {
+                val resolved = onResolveSongStream?.invoke(song)
+                if (resolved != null && isPlayableDirectly(resolved)) {
+                    currentPlaylist = currentPlaylist.map { if (it.id == song.id) resolved else it }
+                    val controller = mediaController ?: return@launch
+                    executePlay(controller, currentPlaylist, index)
+                } else {
+                    _userMessageEvent.tryEmit("Audio untuk '${song.title}' tidak dapat dimuat.")
+                }
             }
         }
     }
@@ -319,23 +432,25 @@ class MusicController(private val context: Context) {
     }
 
     fun skipToNext() {
-        mediaController?.let { controller ->
-            if (controller.hasNextMediaItem()) {
-                controller.seekToNextMediaItem()
-            }
+        val nextIndex = _playbackState.value.currentIndex + 1
+        if (nextIndex in currentPlaylist.indices) {
+            playQueueItem(nextIndex)
+        } else if (_playbackState.value.repeatMode == Player.REPEAT_MODE_ALL && currentPlaylist.isNotEmpty()) {
+            playQueueItem(0)
         }
     }
 
     fun skipToPrevious() {
-        mediaController?.let { controller ->
-            // Jika sudah berjalan > 3 detik, lompat ke awal lagu alih-alih lagu sebelumnya
-            if (controller.currentPosition > 3_000) {
-                controller.seekTo(0)
-            } else if (controller.hasPreviousMediaItem()) {
-                controller.seekToPreviousMediaItem()
-            } else {
-                controller.seekTo(0)
-            }
+        val controller = mediaController
+        if (controller != null && controller.currentPosition > 3_000) {
+            controller.seekTo(0)
+            return
+        }
+        val prevIndex = _playbackState.value.currentIndex - 1
+        if (prevIndex in currentPlaylist.indices) {
+            playQueueItem(prevIndex)
+        } else if (currentPlaylist.isNotEmpty()) {
+            controller?.seekTo(0)
         }
     }
 
@@ -391,6 +506,8 @@ class MusicController(private val context: Context) {
         }
     }
 
+    private var accumulatedListeningMs = 0L
+
     private fun startProgressLoop() {
         progressJob?.cancel()
         progressJob = scope.launch {
@@ -405,6 +522,14 @@ class MusicController(private val context: Context) {
                             duration = dur
                         )
                     }
+
+                    // Rekam statistik waktu mendengarkan musik secara real-time setiap detik
+                    accumulatedListeningMs += 500L
+                    if (accumulatedListeningMs >= 1000L) {
+                        val secondsToAdd = accumulatedListeningMs / 1000L
+                        accumulatedListeningMs %= 1000L
+                        listeningStatsRepository?.addListeningSeconds(secondsToAdd)
+                    }
                 }
                 delay(500)
             }
@@ -413,6 +538,11 @@ class MusicController(private val context: Context) {
 
     private fun stopProgressLoop() {
         progressJob?.cancel()
+        if (accumulatedListeningMs >= 1000L) {
+            val secondsToAdd = accumulatedListeningMs / 1000L
+            accumulatedListeningMs %= 1000L
+            listeningStatsRepository?.addListeningSeconds(secondsToAdd)
+        }
         mediaController?.let { controller ->
             _playbackState.update {
                 it.copy(currentPosition = controller.currentPosition.coerceAtLeast(0L))
@@ -452,13 +582,46 @@ class MusicController(private val context: Context) {
     }
 
     /**
-     * Memeriksa apakah file audio lokal masih tersedia di perangkat.
+     * Memeriksa apakah lagu siap diputar langsung oleh ExoPlayer tanpa memerlukan resolusi URL baru.
+     */
+    fun isPlayableDirectly(song: SongEntity): Boolean {
+        if (song.source == "LOCAL" || song.source == "DOWNLOADED") {
+            return isFileAvailable(song)
+        }
+        if (song.source == "JAMENDO" && (song.contentUri.startsWith("http://") || song.contentUri.startsWith("https://"))) {
+            return true
+        }
+        if (song.source == "YOUTUBE") {
+            if (song.contentUri.startsWith("spotify:") || song.contentUri.isBlank()) {
+                return false
+            }
+            val isExpired = try {
+                val exp = Uri.parse(song.contentUri).getQueryParameter("expire")?.toLongOrNull()
+                exp != null && (System.currentTimeMillis() / 1000L) >= (exp - 60)
+            } catch (_: Exception) {
+                false
+            }
+            return !isExpired && (song.contentUri.startsWith("http://") || song.contentUri.startsWith("https://"))
+        }
+        return false
+    }
+
+    /**
+     * Memeriksa apakah file audio lokal atau stream masih tersedia.
      */
     fun isFileAvailable(song: SongEntity): Boolean {
-        if (!song.filePath.isNullOrBlank()) {
-            val f = File(song.filePath)
+        // Lagu online (YouTube / Jamendo) yang dialirkan langsung dari internet
+        if (song.source == "YOUTUBE" || song.source == "JAMENDO" || song.contentUri.startsWith("http://") || song.contentUri.startsWith("https://")) {
+            return song.contentUri.isNotBlank() || !song.filePath.isNullOrBlank()
+        }
+
+        // Lagu unduhan atau file lokal yang memiliki file path fisik di penyimpanan perangkat
+        if (song.source == "DOWNLOADED" || (!song.filePath.isNullOrBlank() && song.filePath.startsWith("/"))) {
+            val f = File(song.filePath.orEmpty())
             if (!f.exists()) return false
         }
+
+        // Lagu lokal MediaStore (content://...)
         if (song.source == "LOCAL" && song.contentUri.startsWith("content://")) {
             return try {
                 context.contentResolver.openAssetFileDescriptor(Uri.parse(song.contentUri), "r")?.use { true } ?: false

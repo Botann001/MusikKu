@@ -10,11 +10,14 @@ import com.example.musikku.data.local.entity.PlaylistSongEntity
 import com.example.musikku.data.local.entity.SongEntity
 import com.example.musikku.data.scanner.MusicScanner
 import com.example.musikku.data.remote.youtube.toSongEntity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Single source of truth untuk data lagu, favorit, dan playlist.
@@ -72,6 +75,20 @@ class MusicRepository(
 
     val favoriteSongIds: Flow<List<Long>> = songDao.getFavoriteSongIds()
 
+    private val _cachedFavoriteIds = ConcurrentHashMap.newKeySet<Long>()
+    val cachedFavoriteIds: Set<Long> get() = _cachedFavoriteIds
+
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            favoriteSongIds.collect { ids ->
+                _cachedFavoriteIds.clear()
+                _cachedFavoriteIds.addAll(ids)
+            }
+        }
+    }
+
+    fun isFavoriteCached(songId: Long): Boolean = _cachedFavoriteIds.contains(songId)
+
     fun isFavorite(songId: Long): Flow<Boolean> =
         songDao.isFavorite(songId).map { it == true }
 
@@ -82,18 +99,21 @@ class MusicRepository(
             val favSong = fallbackSong.copy(isFavorite = true)
             songDao.insertAll(listOf(favSong))
             favoriteDao.addFavorite(FavoriteEntity(songId = songId))
+            _cachedFavoriteIds.add(songId)
             return@withContext
         }
 
-        val isFav = songDao.getFavoriteSongIds().first().contains(songId)
+        val isFav = _cachedFavoriteIds.contains(songId) || songDao.getFavoriteSongIds().first().contains(songId)
         val newStatus = !isFav
         // Perbarui flag favorit di tabel songs
         songDao.updateFavorite(songId, newStatus)
         // Sinkronkan juga ke tabel favorites untuk konsistensi relasional
         if (newStatus) {
             favoriteDao.addFavorite(FavoriteEntity(songId = songId))
+            _cachedFavoriteIds.add(songId)
         } else {
             favoriteDao.removeFavorite(songId)
+            _cachedFavoriteIds.remove(songId)
             // Bersihkan lagu online yang tidak berada di playlist dan bukan favorit lagi
             if (existingSong?.source == "YOUTUBE") {
                 songDao.deleteOrphanOnlineSongs()

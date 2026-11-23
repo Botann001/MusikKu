@@ -11,15 +11,20 @@ import com.example.musikku.data.local.entity.SongEntity
  * notifikasi sistem Media3 dan pemutar dapat menampilkan informasi lengkap.
  */
 fun SongEntity.toMediaItem(): MediaItem {
+    val uri = if (contentUri.startsWith("spotify:") || contentUri.isBlank()) {
+        android.net.Uri.EMPTY
+    } else {
+        contentUri.toUri()
+    }
     return MediaItem.Builder()
         .setMediaId(id.toString())
-        .setUri(contentUri.toUri())
+        .setUri(uri)
         .setMediaMetadata(
             MediaMetadata.Builder()
                 .setTitle(title)
                 .setArtist(artist)
                 .setAlbumTitle(album)
-                .setArtworkUri(albumArtUri.toUri())
+                .setArtworkUri(if (albumArtUri.isNotBlank()) albumArtUri.toUri() else null)
                 .build()
         )
         .build()

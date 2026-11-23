@@ -21,7 +21,10 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MusicNote
 import com.example.musikku.ui.common.AlbumArtPlaceholder
+import com.example.musikku.ui.common.SongAlbumArt
 import com.example.musikku.ui.common.LiveEqualizerIndicator
+import com.example.musikku.ui.common.rememberSheetScrollBlocker
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
@@ -181,7 +184,12 @@ fun PlaylistDetailSheet(
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                val sheetScrollBlocker = rememberSheetScrollBlocker()
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .nestedScroll(sheetScrollBlocker)
+                ) {
                     itemsIndexed(items = songs, key = { index, song -> "${song.id}_$index" }) { index, song ->
                         val isPlaying = song.id == currentSongId
 
@@ -204,20 +212,12 @@ fun PlaylistDetailSheet(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                if (song.albumArtUri.isNotBlank()) {
-                                    AsyncImage(
-                                        model = song.albumArtUri,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.matchParentSize()
-                                    )
-                                } else {
-                                    AlbumArtPlaceholder(
-                                        seed = song.title,
-                                        modifier = Modifier.matchParentSize(),
-                                        iconSize = 20.dp
-                                    )
-                                }
+                                SongAlbumArt(
+                                    albumArtUri = song.albumArtUri,
+                                    title = song.title,
+                                    modifier = Modifier.matchParentSize(),
+                                    iconSize = 20.dp
+                                )
                             }
 
                             Spacer(modifier = Modifier.width(12.dp))

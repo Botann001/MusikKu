@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -58,6 +60,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,8 +107,11 @@ fun YouTubeContent(
     onAddToQueue: (YouTubeSearchItemDto) -> Unit,
     onAddToPlaylist: (YouTubeSearchItemDto) -> Unit,
     onToggleFavorite: (YouTubeSearchItemDto) -> Unit = {},
-    onDownload: (YouTubeSearchItemDto) -> Unit = {}
+    onDownload: (YouTubeSearchItemDto) -> Unit = {},
+    onLoadMore: () -> Unit = {},
+    onOpenSpotifyImportDialog: () -> Unit = {}
 ) {
+    val listState = rememberLazyListState()
     var searchInput by remember { mutableStateOf(state.query) }
     val focusManager = LocalFocusManager.current
     val genreChips = listOf(
@@ -121,9 +128,35 @@ fun YouTubeContent(
     )
     var selectedGenre by remember { mutableStateOf("🔥 Trending") }
 
+    // Sinkronisasi otomatis saat query di-reset dari luar (misal kembali ke tab Jelajah)
+    LaunchedEffect(state.query) {
+        if (searchInput != state.query) {
+            searchInput = state.query
+        }
+        if (state.query.isBlank()) {
+            selectedGenre = "🔥 Trending"
+        }
+    }
+
     val displayItems = if (state.query.isBlank()) state.trendingTracks else state.results
 
+    // Deteksi Infinite Scroll saat pengguna scroll mendekati ujung daftar
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val totalItems = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            totalItems > 4 && lastVisible >= totalItems - 3
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && !state.isLoadingMore && state.hasMoreResults && state.query.isNotBlank()) {
+            onLoadMore()
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             top = 6.dp,
@@ -182,6 +215,50 @@ fun YouTubeContent(
             }
         }
 
+        // ─── 1a. Tombol Cepat Impor Spotify ──────────────────────────────────────
+        item(key = "yt_spotify_import_pill") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFF1DB954).copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.35f)),
+                    modifier = Modifier.clickable { onOpenSpotifyImportDialog() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF1DB954),
+                            modifier = Modifier.size(16.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Link,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.explore_import_spotify),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1DB954)
+                        )
+                    }
+                }
+            }
+        }
+
         // ─── 1b. Pencarian Terakhir (Recent Searches) ─────────────────────────────
         if (recentSearches.isNotEmpty() && searchInput.isBlank()) {
             item(key = "yt_recent_searches") {
@@ -204,14 +281,14 @@ fun YouTubeContent(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Pencarian Terakhir",
+                                text = stringResource(R.string.explore_recent_searches),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                         Text(
-                            text = "Hapus Semua",
+                            text = stringResource(R.string.explore_clear_all),
                             style = MaterialTheme.typography.labelSmall,
                             color = ElectricLime,
                             fontWeight = FontWeight.Medium,
@@ -352,34 +429,6 @@ fun YouTubeContent(
             }
         }
 
-        // ─── 3b. Info Notice Banner ──────────────────────────────────────────────
-        item(key = "yt_notice_banner") {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
-                Surface(
-                    color = JetCard.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "💡",
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Streaming YouTube publik sewaktu-waktu dibatasi oleh Google. Jika terkendala, nikmati jutaan musik bebas hambatan di tab Jamendo.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFAAAAAA),
-                            lineHeight = 15.sp
-                        )
-                    }
-                }
-            }
-        }
 
         // ─── 4. Main Body: Results / Loading / Empty ─────────────────────────────
         when {
@@ -483,7 +532,7 @@ fun YouTubeContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (state.query.isBlank()) "Lagu Populer & Trending" else "Hasil Pencarian (\"${state.query}\")",
+                            text = if (state.query.isBlank()) stringResource(R.string.explore_popular_trending) else "Hasil Pencarian (\"${state.query}\")",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -521,6 +570,62 @@ fun YouTubeContent(
                             onToggleFavorite = { onToggleFavorite(item) },
                             onDownload = { onDownload(item) }
                         )
+                    }
+                }
+
+                // ─── Indikator & Tombol Muat Lebih Banyak Lagu (Pagination) ───
+                if (state.query.isNotBlank()) {
+                    item(key = "yt_load_more_footer") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (state.isLoadingMore) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = ElectricLime,
+                                        strokeWidth = 2.5.dp,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Memuat lagu lainnya...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextMuted
+                                    )
+                                }
+                            } else if (state.hasMoreResults) {
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                    modifier = Modifier.clickable { onLoadMore() }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = ElectricLime,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Muat Lebih Banyak Lagu",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
