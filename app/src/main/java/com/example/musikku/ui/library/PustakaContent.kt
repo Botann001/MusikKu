@@ -34,11 +34,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FileDownloadDone
@@ -446,7 +449,11 @@ fun PustakaContent(
                         PustakaSongRow(
                             song = song,
                             isPlaying = isPlaying && currentSongId == song.id,
-                            onClick = { onSongClick(song) }
+                            onClick = { onSongClick(song) },
+                            onPlayNext = { onPlayNext(song) },
+                            onAddToQueue = { onAddToQueue(song) },
+                            onAddToPlaylist = { onAddToPlaylist(song) },
+                            onDeleteFromDevice = if (song.source == "DOWNLOADED") ({ onDeleteSong(song) }) else null
                         )
                     }
                 } else if (activeFilter == PustakaFilter.ALBUMS) {
@@ -867,7 +874,7 @@ private fun SubCategoryDetailView(
     val (title, displaySongs) = when (category) {
         PustakaCategory.FAVORITES -> Pair(titleFavorites, favoriteSongs)
         PustakaCategory.LOCAL     -> Pair(titleLocal, songs)
-        PustakaCategory.DOWNLOADED -> Pair(titleDownloaded, songs.filter { it.source == "DOWNLOADED" }.ifEmpty { songs.take(15) })
+        PustakaCategory.DOWNLOADED -> Pair(titleDownloaded, songs.filter { it.source == "DOWNLOADED" })
         PustakaCategory.TOP50     -> Pair(titleTop50, songs.take(50))
         PustakaCategory.CACHE     -> Pair(titleCache, songs.take(10))
         PustakaCategory.UPLOADED  -> Pair(titleUploaded, emptyList<SongEntity>())
@@ -1291,10 +1298,15 @@ private fun SubCategoryDetailView(
             // Daftar Lagu Terfilter
             if (filteredSongs.isNotEmpty()) {
                 items(filteredSongs, key = { it.id }) { song ->
+                    val canDeleteFromDevice = category == PustakaCategory.LOCAL || song.source == "DOWNLOADED"
                     PustakaSongRow(
                         song = song,
                         isPlaying = isPlaying && currentSongId == song.id,
-                        onClick = { onSongClick(song, filteredSongs) }
+                        onClick = { onSongClick(song, filteredSongs) },
+                        onPlayNext = { onPlayNext(song) },
+                        onAddToQueue = { onAddToQueue(song) },
+                        onAddToPlaylist = { onAddToPlaylist(song) },
+                        onDeleteFromDevice = if (canDeleteFromDevice) ({ onDeleteSong(song) }) else null
                     )
                 }
             } else {
@@ -1324,7 +1336,11 @@ private fun SubCategoryDetailView(
 private fun PustakaSongRow(
     song: SongEntity,
     isPlaying: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onPlayNext: () -> Unit = {},
+    onAddToQueue: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
+    onDeleteFromDevice: (() -> Unit)? = null
 ) {
     val durationText = remember(song.duration) {
         val totalSec = song.duration / 1000
@@ -1335,6 +1351,7 @@ private fun PustakaSongRow(
 
     var isImageError by remember(song.albumArtUri) { mutableStateOf(false) }
     val showPlaceholder = song.albumArtUri.isBlank() || isImageError
+    var showMenu by remember { mutableStateOf(false) }
 
     Surface(
         onClick = onClick,
@@ -1400,13 +1417,105 @@ private fun PustakaSongRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "${song.artist} • $durationText",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (song.source == "DOWNLOADED") {
+                        Icon(
+                            imageVector = Icons.Default.FileDownloadDone,
+                            contentDescription = null,
+                            tint = Color(0xFF67E8A6),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = "${song.artist} • $durationText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.song_options),
+                        tint = TextMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_play_next)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onPlayNext()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_add_to_queue)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onAddToQueue()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_add_to_playlist)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onAddToPlaylist()
+                        }
+                    )
+                    if (onDeleteFromDevice != null) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.menu_delete_from_device),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onDeleteFromDevice()
+                            }
+                        )
+                    }
+                }
             }
         }
     }

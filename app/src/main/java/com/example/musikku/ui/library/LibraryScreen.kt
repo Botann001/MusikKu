@@ -265,7 +265,7 @@ fun LibraryScreen(
 
     val executeDeleteSong: (SongEntity) -> Unit = { song ->
         val uri = try { Uri.parse(song.contentUri) } catch (e: Exception) { null }
-        if (song.source == "DOWNLOADED" || (song.filePath != null && !song.filePath.startsWith("/storage/emulated/0/"))) {
+        if (song.source == "DOWNLOADED" || (song.filePath != null && !song.filePath.startsWith("/storage/"))) {
             viewModel.deleteSong(song)
             Toast.makeText(context, "Lagu \"${song.title}\" berhasil dihapus", Toast.LENGTH_SHORT).show()
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && uri != null && uri.scheme == "content") {
@@ -826,7 +826,7 @@ fun LibraryScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Hapus Lagu?",
+                        text = stringResource(R.string.delete_song_title),
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -835,7 +835,7 @@ fun LibraryScreen(
             text = {
                 Column {
                     Text(
-                        text = "Apakah Anda yakin ingin menghapus lagu ini dari penyimpanan perangkat?",
+                        text = stringResource(R.string.delete_song_confirm_msg),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White
                     )
@@ -853,7 +853,7 @@ fun LibraryScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "File akan dihapus secara permanen dari perangkat dan tidak dapat dipulihkan.",
+                        text = stringResource(R.string.delete_song_warning_msg),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                     )
@@ -871,12 +871,12 @@ fun LibraryScreen(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Hapus Permanen")
+                    Text(stringResource(R.string.delete_song_confirm_btn))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { songToDelete = null }) {
-                    Text("Batal", color = Color.White)
+                    Text(stringResource(R.string.settings_cancel), color = Color.White)
                 }
             },
             containerColor = JetCard,

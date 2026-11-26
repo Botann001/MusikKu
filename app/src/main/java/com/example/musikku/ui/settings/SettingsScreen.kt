@@ -574,7 +574,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "MusikKu v1.0.0 (Release)\n" +
+                        text = "MusikKu v${com.example.musikku.BuildConfig.VERSION_NAME} (Release)\n" +
                                 "Aplikasi pemutar musik modern berbasis Material 3 & Jetpack Media3. " +
                                 "Menyediakan pemutaran lagu lokal, playlist, antrean, dan musik legal bebas hak cipta via Jamendo API (Lisensi Creative Commons).",
                         style = MaterialTheme.typography.bodySmall,

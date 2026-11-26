@@ -30,6 +30,15 @@
     }
   })();
 
+  const loadedSavedTracks = (() => {
+    try {
+      const raw = localStorage.getItem('musikku_saved_tracks_v1');
+      return raw ? new Map(JSON.parse(raw)) : new Map();
+    } catch (e) {
+      return new Map();
+    }
+  })();
+
   const state = {
     allSongs: [],
     onlineSongs: [],
@@ -49,12 +58,24 @@
     isShuffle: false,
     repeatMode: 0, // 0: off, 1: repeat-all, 2: repeat-one
     activeTab: 'library', // 'library' | 'online' | 'favorites' | 'downloads' | 'playlists'
+    tabScrollPositions: {},
     onlineSource: 'youtube', // 'youtube' | 'jamendo' (sama seperti aplikasi Android MusikKu)
     activeGenre: 'trending',
     searchQuery: '',
 
     favorites: new Set(JSON.parse(localStorage.getItem('musikku_favs') || '[]')),
     favoriteSongs: loadedFavItems,
+    savedTracksMap: loadedSavedTracks,
+    recentlyPlayed: JSON.parse(localStorage.getItem('musikku_recently_played_v1') || '[]'),
+    listeningStats: (() => {
+      try {
+        const raw = localStorage.getItem('musikku_stats_v1');
+        const parsed = raw ? JSON.parse(raw) : null;
+        return parsed && typeof parsed === 'object' ? parsed : { totalSeconds: 0, daily: {} };
+      } catch {
+        return { totalSeconds: 0, daily: {} };
+      }
+    })(),
     scannedFolders: JSON.parse(localStorage.getItem('musikku_folders') || '[]'),
     metadataCache: new Map(),
     volume: parseFloat(localStorage.getItem('musikku_vol') || '0.8'),
@@ -179,6 +200,24 @@
     localStorage.setItem('musikku_folders', JSON.stringify(state.scannedFolders));
   }
 
+  function saveSavedTracks() {
+    try {
+      localStorage.setItem('musikku_saved_tracks_v1', JSON.stringify(Array.from(state.savedTracksMap.entries())));
+    } catch (e) {
+      console.warn('Gagal menyimpan cache track:', e);
+    }
+  }
+
+  function rememberTracks(tracks) {
+    if (!Array.isArray(tracks) || tracks.length === 0) return;
+    tracks.forEach(t => {
+      if (!t) return;
+      const key = getSongKey(t);
+      if (key) state.savedTracksMap.set(key, t);
+    });
+    saveSavedTracks();
+  }
+
   // ─── DOM Elements Cache ────────────────────────────────────────────────────
   const elements = {
     // Window controls
@@ -187,6 +226,7 @@
     btnClose: document.getElementById('btn-close'),
 
     // Nav & Sidebar Resizing
+    mainContent: document.getElementById('main-content'),
     sidebarRail: document.getElementById('sidebar-rail'),
     sidebarResizer: document.getElementById('sidebar-resizer'),
     btnToggleSidebar: document.getElementById('btn-toggle-sidebar'),
@@ -226,6 +266,7 @@
     heroVolVal: document.getElementById('hero-vol-val'),
 
     libCount: document.getElementById('lib-count'),
+    libSortSelect: document.getElementById('lib-sort-select'),
     libPlayAll: document.getElementById('lib-play-all'),
     libShuffle: document.getElementById('lib-shuffle'),
     koleksiNowCard: document.getElementById('koleksi-now-card'),
@@ -305,6 +346,7 @@
     plDetailMeta: document.getElementById('pl-detail-meta'),
     plDetailPlayAll: document.getElementById('pl-detail-play-all'),
     plDetailShuffle: document.getElementById('pl-detail-shuffle'),
+    plDetailDownloadAll: document.getElementById('pl-detail-download-all'),
     plDetailRename: document.getElementById('pl-detail-rename'),
     plDetailDelete: document.getElementById('pl-detail-delete'),
     plDetailTrackCount: document.getElementById('pl-detail-track-count'),
@@ -448,12 +490,47 @@
     // Context Menu
     contextMenu: document.getElementById('track-context-menu'),
     ctxPlay: document.getElementById('ctx-play'),
+    ctxPlayNext: document.getElementById('ctx-play-next'),
+    ctxAddQueue: document.getElementById('ctx-add-queue'),
     ctxFav: document.getElementById('ctx-fav'),
     ctxChangeCover: document.getElementById('ctx-change-cover'),
     ctxResetCover: document.getElementById('ctx-reset-cover'),
     ctxPlList: document.getElementById('ctx-pl-list'),
     ctxNewPl: document.getElementById('ctx-new-pl'),
-    coverFileInput: document.getElementById('cover-file-input')
+    ctxDeleteDivider: document.getElementById('ctx-delete-divider'),
+    ctxDeleteDevice: document.getElementById('ctx-delete-device'),
+    coverFileInput: document.getElementById('cover-file-input'),
+
+    // Spotify Import Modal & Triggers
+    btnSidebarSpotify: document.getElementById('btn-sidebar-spotify'),
+    btnOnlineImportSpotify: document.getElementById('btn-online-import-spotify'),
+    btnPlImportSpotify: document.getElementById('btn-pl-import-spotify'),
+    spotifyImportModal: document.getElementById('spotify-import-modal'),
+    btnCloseSpotifyModal: document.getElementById('btn-close-spotify-modal'),
+    btnCancelSpotify: document.getElementById('btn-cancel-spotify'),
+    inputSpotifyUrl: document.getElementById('input-spotify-url'),
+    btnFetchSpotify: document.getElementById('btn-fetch-spotify'),
+    spotifyLoading: document.getElementById('spotify-loading'),
+    spotifyError: document.getElementById('spotify-error'),
+    spotifyPreview: document.getElementById('spotify-preview'),
+    spotifyPreviewCover: document.getElementById('spotify-preview-cover'),
+    spotifyPreviewCoverFallback: document.getElementById('spotify-preview-cover-fallback'),
+    spotifyPreviewType: document.getElementById('spotify-preview-type'),
+    spotifyPreviewTitle: document.getElementById('spotify-preview-title'),
+    spotifyPreviewSub: document.getElementById('spotify-preview-sub'),
+    spotifyTrackList: document.getElementById('spotify-track-list'),
+    spotifyPreviewActions: document.getElementById('spotify-preview-actions'),
+    btnSpotifyPlayAll: document.getElementById('btn-spotify-play-all'),
+    btnSpotifySavePlaylist: document.getElementById('btn-spotify-save-playlist'),
+
+    // Library Insights & Spotify Charts
+    statListenTime: document.getElementById('stat-listen-time'),
+    statTotalSongs: document.getElementById('stat-total-songs'),
+    statLikedSongs: document.getElementById('stat-liked-songs'),
+    recentPlayedSection: document.getElementById('recent-played-section'),
+    recentPlayedList: document.getElementById('recent-played-list'),
+    btnClearRecentPlayed: document.getElementById('btn-clear-recent-played'),
+    spotifyChartsRow: document.getElementById('spotify-charts-row')
   };
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -775,6 +852,9 @@
 
   function getAllKnownSongs() {
     const map = new Map();
+    if (state.savedTracksMap) {
+      state.savedTracksMap.forEach(s => map.set(getSongKey(s), s));
+    }
     state.allSongs.forEach(s => map.set(getSongKey(s), s));
     state.downloadedSongs.forEach(s => map.set(getSongKey(s), s));
     state.favoriteSongs.forEach(s => map.set(getSongKey(s), s));
@@ -810,6 +890,25 @@
 
   // ─── Tab Navigation ────────────────────────────────────────────────────────
   function switchTab(tabName) {
+    const prevTab = state.activeTab;
+
+    // Jika tab yang sama diklik ulang, gulir kembali ke atas dengan mulus
+    if (prevTab === tabName) {
+      if (elements.mainContent && elements.mainContent.scrollTop > 0) {
+        elements.mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+        state.tabScrollPositions[tabName] = 0;
+      }
+      if (tabName === 'playlists') {
+        showPlaylistOverview();
+      }
+      return;
+    }
+
+    // Simpan posisi scroll masing-masing tab sebelum berpindah agar tidak terbawa ke tab lain
+    if (prevTab && elements.mainContent) {
+      state.tabScrollPositions[prevTab] = elements.mainContent.scrollTop;
+    }
+
     state.activeTab = tabName;
     state.searchQuery = '';
 
@@ -836,6 +935,7 @@
     if (tabName === 'library') {
       applyFilterAndRenderLibrary();
     } else if (tabName === 'online') {
+      renderSpotifyCharts();
       if (elements.tunerStops && elements.tunerStops.children.length === 0) {
         renderTunerStops();
       }
@@ -854,6 +954,17 @@
       showPlaylistOverview();
     } else if (tabName === 'settings') {
       renderSettingsView();
+    }
+
+    // Pulihkan posisi scroll independen milik tab tujuan (default 0 / paling atas)
+    if (elements.mainContent) {
+      const targetScroll = state.tabScrollPositions[tabName] || 0;
+      elements.mainContent.scrollTop = targetScroll;
+      requestAnimationFrame(() => {
+        if (elements.mainContent && state.activeTab === tabName) {
+          elements.mainContent.scrollTop = targetScroll;
+        }
+      });
     }
   }
 
@@ -1516,7 +1627,7 @@
       targetUrl = song.streamUrl;
     } else if (song.isOnline && window.elektronAPI?.resolveStreamUrl) {
       try {
-        targetUrl = await window.elektronAPI.resolveStreamUrl(song);
+        targetUrl = await window.elektronAPI.resolveStreamUrl({ ...song, audioQuality: state.audioQuality });
         song.streamUrl = targetUrl;
       } catch (err) {
         targetUrl = song.streamUrl || (song.path ? formatAudioSrc(song.path) : '');
@@ -1536,6 +1647,7 @@
     audio.src = targetUrl;
     audio.play().then(() => {
       state.isPlaying = true;
+      recordRecentlyPlayed(song);
       updatePlayerUI();
       renderCurrentScreenTracks();
     }).catch(err => {
@@ -1805,6 +1917,7 @@
     saveFavorites();
     updatePlayerUI();
     renderCurrentScreenTracks();
+    renderLibraryInsights();
     if (state.npActiveTab === 'queue') renderQueue();
   }
 
@@ -2135,8 +2248,13 @@
 
     if (song.isOnline) {
       const badge = document.createElement('span');
-      badge.className = 'badge badge-online';
-      badge.textContent = 'ONLINE';
+      if (song.source === 'Spotify') {
+        badge.className = 'badge badge-spotify';
+        badge.textContent = 'SPOTIFY';
+      } else {
+        badge.className = 'badge badge-online';
+        badge.textContent = 'ONLINE';
+      }
       titleRow.appendChild(badge);
     } else if (isDownloaded) {
       const badge = document.createElement('span');
@@ -2195,12 +2313,25 @@
     durEl.className = 'dur';
     durEl.textContent = formatTime(song.duration);
 
+    // 7. More Options Button (⋮)
+    const actMore = document.createElement('div');
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'action-btn';
+    moreBtn.title = TRANSLATIONS[state.language]?.song_options || 'Opsi lagu';
+    moreBtn.innerHTML = '<span class="material-icons-round">more_vert</span>';
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY, song);
+    });
+    actMore.appendChild(moreBtn);
+
     row.appendChild(numEl);
     row.appendChild(discEl);
     row.appendChild(titleGroup);
     row.appendChild(act1);
     row.appendChild(act2);
     row.appendChild(durEl);
+    row.appendChild(actMore);
 
     row.addEventListener('click', () => {
       playSong(song, list, index);
@@ -2318,7 +2449,19 @@
       );
     }
 
+    const sortMode = elements.libSortSelect?.value || 'title';
+    if (sortMode === 'recent') {
+      songs.sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
+    } else if (sortMode === 'artist') {
+      songs.sort((a, b) => (a.artist || '').localeCompare(b.artist || ''));
+    } else if (sortMode === 'duration') {
+      songs.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+    } else {
+      songs.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+
     elements.libCount.textContent = `${songs.length} lagu`;
+    renderLibraryInsights();
 
     if (songs.length === 0) {
       elements.libraryTrackList.innerHTML = '';
@@ -2333,6 +2476,8 @@
       elements.libraryTrackList.appendChild(fragment);
     }
   }
+
+  elements.libSortSelect?.addEventListener('change', applyFilterAndRenderLibrary);
 
   elements.librarySearch?.addEventListener('focus', () => {
     renderRecentSearchPopover('lib');
@@ -2627,6 +2772,11 @@
     clearTimeout(onlineSearchTimer);
     onlineSearchTimer = setTimeout(() => {
       if (q) {
+        if (isSpotifyUrl(q)) {
+          elements.onlineSearchInput.value = '';
+          openSpotifyImportModal(q, true);
+          return;
+        }
         saveRecentSearch(q, 'online');
         if (elements.activeTunerLabel) elements.activeTunerLabel.textContent = `"${q}"`;
         elements.tunerStops?.querySelectorAll('.stop').forEach(s => s.removeAttribute('aria-pressed'));
@@ -2647,8 +2797,13 @@
       const q = elements.onlineSearchInput.value.trim();
       if (q) {
         clearTimeout(onlineSearchTimer);
-        saveRecentSearch(q, 'online');
         elements.onlineRecentPopover?.classList.add('hidden');
+        if (isSpotifyUrl(q)) {
+          elements.onlineSearchInput.value = '';
+          openSpotifyImportModal(q, true);
+          return;
+        }
+        saveRecentSearch(q, 'online');
         if (elements.activeTunerLabel) elements.activeTunerLabel.textContent = `"${q}"`;
         elements.tunerStops?.querySelectorAll('.stop').forEach(s => s.removeAttribute('aria-pressed'));
         fetchOnlineTracks(q);
@@ -3087,6 +3242,7 @@
     if (elements.playlistOverview) elements.playlistOverview.classList.add('hidden');
     if (elements.playlistDetail) elements.playlistDetail.classList.remove('hidden');
     renderPlaylistDetail(playlistId);
+    if (elements.mainContent) elements.mainContent.scrollTop = 0;
   }
 
   function renderPlaylistDetail(playlistId) {
@@ -3123,8 +3279,8 @@
         tracks.forEach((track, idx) => {
           fragment.appendChild(createTrackRow(track, idx, tracks, {
             onRemove: (songToRemove) => {
-              const key = songToRemove.path || songToRemove.streamUrl;
-              pl.trackIds = pl.trackIds.filter(id => id !== key);
+              const key = getSongKey(songToRemove);
+              pl.trackIds = pl.trackIds.filter(id => id !== key && id !== songToRemove.path && id !== songToRemove.streamUrl);
               pl.updatedAt = Date.now();
               savePlaylists();
               renderPlaylistDetail(playlistId);
@@ -3136,7 +3292,10 @@
     }
   }
 
-  elements.btnBackPlaylists?.addEventListener('click', showPlaylistOverview);
+  elements.btnBackPlaylists?.addEventListener('click', () => {
+    showPlaylistOverview();
+    if (elements.mainContent) elements.mainContent.scrollTop = 0;
+  });
 
   elements.plDetailPlayAll?.addEventListener('click', () => {
     if (!state.activePlaylistId) return;
@@ -3158,6 +3317,60 @@
       const rnd = Math.floor(Math.random() * tracks.length);
       playSong(tracks[rnd], tracks, rnd);
     }
+  });
+
+  elements.plDetailDownloadAll?.addEventListener('click', async () => {
+    if (!state.activePlaylistId || !window.elektronAPI?.downloadTrack) return;
+    const pl = state.playlists.find(p => p.id === state.activePlaylistId);
+    if (!pl) return;
+    const trackIds = Array.isArray(pl.trackIds) ? pl.trackIds : [];
+    const tracks = trackIds.map(id => findSongByKey(id)).filter(Boolean);
+    const pending = tracks.filter(t => t.isOnline && !isSongDownloaded(t));
+
+    if (pending.length === 0) {
+      showDownloadToast('Semua lagu di playlist ini sudah tersimpan offline', 100);
+      hideDownloadToast(2200);
+      return;
+    }
+
+    const btn = elements.plDetailDownloadAll;
+    btn.disabled = true;
+    let successCount = 0;
+
+    for (let i = 0; i < pending.length; i++) {
+      const t = pending[i];
+      const pct = Math.round(((i) / pending.length) * 100);
+      showDownloadToast(`Mengunduh (${i + 1}/${pending.length}): ${t.title}...`, Math.max(5, pct));
+      try {
+        const result = await window.elektronAPI.downloadTrack({ ...t, audioQuality: state.audioQuality });
+        if (result && result.success) {
+          successCount++;
+          const newDownloadedSong = {
+            id: t.id,
+            title: result.title || t.title,
+            artist: result.artist || t.artist,
+            album: result.album || t.album,
+            path: result.filePath,
+            duration: t.duration || result.duration || 0,
+            cover: t.cover || result.cover || '',
+            size: result.size || 0,
+            isDownloaded: true
+          };
+          state.downloadedSongs.unshift(newDownloadedSong);
+          saveDownloads();
+          state.allSongs.unshift(newDownloadedSong);
+          updateDownloadsCountBadge();
+        }
+      } catch (err) {
+        console.warn('Batch download skip:', t.title, err);
+      }
+    }
+
+    btn.disabled = false;
+    renderPlaylistDetail(pl.id);
+    renderLibraryInsights();
+    showDownloadToast(`Selesai mengunduh ${successCount} dari ${pending.length} lagu!`, 100);
+    hideDownloadToast(3000);
   });
 
   // Ubah Nama Playlist
@@ -3349,6 +3562,7 @@
       } else {
         const initialTracks = [];
         if (targetSong) {
+          rememberTracks([targetSong]);
           const songKey = getSongKey(targetSong);
           if (songKey) initialTracks.push(songKey);
         }
@@ -3481,6 +3695,7 @@
           showDownloadToast(`Dihapus dari "${pl.name}"`, 100);
         } else {
           pl.trackIds.push(songKey);
+          rememberTracks([songTargetForPlaylist]);
           pl.updatedAt = Date.now();
           savePlaylists();
           showDownloadToast(`Ditambahkan ke "${pl.name}"`, 100);
@@ -3600,6 +3815,10 @@
       elements.ctxResetCover.classList.toggle('hidden', !hasCustomCover);
     }
 
+    const canDeleteFromDevice = Boolean(song.path && (!song.isOnline || song.isDownloaded || isSongDownloaded(song)));
+    elements.ctxDeleteDivider?.classList.toggle('hidden', !canDeleteFromDevice);
+    elements.ctxDeleteDevice?.classList.toggle('hidden', !canDeleteFromDevice);
+
     // Populate playlists
     elements.ctxPlList.innerHTML = '';
     state.playlists.forEach(pl => {
@@ -3616,6 +3835,7 @@
       div.addEventListener('click', () => {
         if (!alreadyIn) {
           pl.trackIds.push(songKey);
+          rememberTracks([songTargetForPlaylist]);
           pl.updatedAt = Date.now();
           savePlaylists();
           showDownloadToast(`Ditambahkan ke ${pl.name}`, 100);
@@ -3627,7 +3847,7 @@
     });
 
     elements.contextMenu.style.left = `${Math.min(window.innerWidth - 240, x)}px`;
-    elements.contextMenu.style.top = `${Math.min(window.innerHeight - 300, y)}px`;
+    elements.contextMenu.style.top = `${Math.min(window.innerHeight - 360, y)}px`;
     elements.contextMenu.classList.remove('hidden');
   }
 
@@ -3636,9 +3856,122 @@
     contextSong = null;
   }
 
+  async function deleteSongFromDevice(song) {
+    if (!song || !song.path) return;
+    const dict = TRANSLATIONS[state.language] || TRANSLATIONS.id;
+    const confirmed = await showConfirmModal({
+      title: dict.delete_song_title || 'Hapus Lagu?',
+      subtitle: dict.delete_song_sub || 'File akan dihapus permanen dari penyimpanan komputer',
+      message: `${dict.delete_song_confirm_msg || 'Apakah Anda yakin ingin menghapus lagu ini secara permanen dari perangkat?'}<br><br><strong>"${song.title || 'Unknown Title'}"</strong><br><span style="color:var(--muted);font-size:12px;">${song.artist || 'Unknown Artist'}</span><br><br><code style="font-size:11px;word-break:break-all;opacity:0.8;">${song.path}</code>`,
+      confirmText: dict.delete_song_confirm_btn || 'Hapus Permanen',
+      cancelText: dict.btn_cancel || 'Batal',
+      icon: 'delete_outline',
+      isDanger: true
+    });
+
+    if (!confirmed) return;
+
+    const songPath = song.path;
+    const songKey = getSongKey(song);
+
+    // Lepaskan file dari pemutar audio jika sedang diputar agar Windows tidak mengunci file
+    if (state.currentSong && (state.currentSong.path === songPath || getSongKey(state.currentSong) === songKey)) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      state.isPlaying = false;
+      state.currentSong = null;
+      state.currentSongIndex = -1;
+      updatePlayerUI();
+    }
+
+    if (window.elektronAPI?.deleteSongFile) {
+      const res = await window.elektronAPI.deleteSongFile(songPath);
+      if (res && !res.success) {
+        showDownloadToast(`Gagal menghapus file: ${res.error || 'Error'}`, 0);
+        hideDownloadToast(3000);
+        return;
+      }
+    }
+
+    // Bersihkan dari seluruh state & penyimpanan lokal
+    state.allSongs = state.allSongs.filter(s => s.path !== songPath && getSongKey(s) !== songKey);
+    state.downloadedSongs = state.downloadedSongs.filter(s => s.path !== songPath && getSongKey(s) !== songKey);
+    saveDownloads();
+
+    state.currentList = state.currentList.filter(s => s.path !== songPath && getSongKey(s) !== songKey);
+
+    state.favorites.delete(songKey);
+    state.favorites.delete(songPath);
+    state.favoriteSongs.delete(songKey);
+    state.favoriteSongs.delete(songPath);
+    saveFavorites();
+
+    if (Array.isArray(state.playlists)) {
+      let plChanged = false;
+      state.playlists.forEach(pl => {
+        if (Array.isArray(pl.trackIds)) {
+          const before = pl.trackIds.length;
+          pl.trackIds = pl.trackIds.filter(id => id !== songKey && id !== songPath);
+          if (pl.trackIds.length !== before) {
+            pl.updatedAt = Date.now();
+            plChanged = true;
+          }
+        }
+      });
+      if (plChanged) savePlaylists();
+    }
+
+    updateDownloadsCountBadge();
+    renderCurrentScreenTracks();
+    renderFavorites();
+    renderDownloads();
+    renderQueue();
+
+    showDownloadToast(`"${song.title || 'Lagu'}" dihapus permanen dari perangkat`, 100);
+    hideDownloadToast(2500);
+  }
+
+  function playNextInQueue(song) {
+    if (!song) return;
+    rememberTracks([song]);
+    if (!state.currentSong || !Array.isArray(state.currentList) || state.currentList.length === 0) {
+      playSong(song, [song], 0);
+      return;
+    }
+    const insertIdx = Math.max(0, state.currentSongIndex + 1);
+    state.currentList.splice(insertIdx, 0, song);
+    renderQueue();
+    const dict = TRANSLATIONS[state.language] || TRANSLATIONS.id;
+    showDownloadToast(`${dict.toast_play_next || 'Diputar berikutnya'}: "${song.title || 'Lagu'}"`, 100);
+    hideDownloadToast(2200);
+  }
+
+  function addToQueue(song) {
+    if (!song) return;
+    rememberTracks([song]);
+    if (!state.currentSong || !Array.isArray(state.currentList) || state.currentList.length === 0) {
+      playSong(song, [song], 0);
+      return;
+    }
+    state.currentList.push(song);
+    renderQueue();
+    const dict = TRANSLATIONS[state.language] || TRANSLATIONS.id;
+    showDownloadToast(`${dict.toast_added_queue || 'Ditambahkan ke antrean'}: "${song.title || 'Lagu'}"`, 100);
+    hideDownloadToast(2200);
+  }
+
   window.addEventListener('click', hideContextMenu);
   elements.ctxPlay?.addEventListener('click', () => {
     if (contextSong) playSong(contextSong, [contextSong], 0);
+    hideContextMenu();
+  });
+  elements.ctxPlayNext?.addEventListener('click', () => {
+    if (contextSong) playNextInQueue(contextSong);
+    hideContextMenu();
+  });
+  elements.ctxAddQueue?.addEventListener('click', () => {
+    if (contextSong) addToQueue(contextSong);
     hideContextMenu();
   });
   elements.ctxFav?.addEventListener('click', () => {
@@ -3661,6 +3994,11 @@
     const s = contextSong;
     hideContextMenu();
     openPlaylistModal(null, s);
+  });
+  elements.ctxDeleteDevice?.addEventListener('click', () => {
+    const s = contextSong;
+    hideContextMenu();
+    if (s) deleteSongFromDevice(s);
   });
 
   // ─── Tools Download URL Modal ──────────────────────────────────────────────
@@ -3725,7 +4063,8 @@
         downloadUrl: url,
         title,
         artist,
-        album: 'URL Download'
+        album: 'URL Download',
+        audioQuality: state.audioQuality
       });
 
       if (result && result.success) {
@@ -3761,6 +4100,216 @@
       elements.modalProgressText.textContent = 'Gagal mengunduh: ' + (err.message || 'Error');
       elements.btnStartUrlDownload.disabled = false;
     }
+  });
+
+  // ─── Spotify Import Modal Controller ───────────────────────────────────────
+  let activeSpotifyImport = null;
+
+  function isSpotifyUrl(text) {
+    return /(?:https?:\/\/(?:open|play)\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:user\/[^/]+\/)?|spotify:)(track|playlist|album)[:/]([a-zA-Z0-9]+)/i.test(String(text || '').trim());
+  }
+
+  function convertSpotifyResultToSongs(result) {
+    if (!result || !Array.isArray(result.tracks)) return [];
+    const albumName = result.title || 'Spotify';
+    return result.tracks.map((t, idx) => ({
+      id: `spotify_${t.id || idx}`,
+      title: t.title || `Lagu ${idx + 1}`,
+      artist: t.artist || 'Artis Spotify',
+      album: albumName,
+      duration: Math.round((t.durationMs || 0) / 1000),
+      cover: t.coverArtUri || result.coverArtUri || '',
+      spotifyUri: t.spotifyUri || '',
+      sourceUrl: '',
+      streamUrl: '',
+      isOnline: true,
+      isFullTrack: true,
+      source: 'Spotify'
+    }));
+  }
+
+  function openSpotifyImportModal(prefillUrl = '', autoFetch = false) {
+    if (!elements.spotifyImportModal) return;
+    elements.spotifyImportModal.style.display = 'flex';
+    elements.spotifyImportModal.classList.remove('hidden');
+
+    if (prefillUrl && elements.inputSpotifyUrl) {
+      elements.inputSpotifyUrl.value = prefillUrl;
+    }
+
+    if (!prefillUrl) {
+      activeSpotifyImport = null;
+      elements.spotifyError?.classList.add('hidden');
+      elements.spotifyLoading?.classList.add('hidden');
+      elements.spotifyPreview?.classList.add('hidden');
+      elements.spotifyPreviewActions?.classList.add('hidden');
+      if (elements.inputSpotifyUrl) {
+        elements.inputSpotifyUrl.value = '';
+        setTimeout(() => elements.inputSpotifyUrl?.focus(), 40);
+      }
+    } else if (autoFetch) {
+      fetchSpotifyLink();
+    }
+  }
+
+  function closeSpotifyImportModal() {
+    if (!elements.spotifyImportModal) return;
+    elements.spotifyImportModal.classList.add('hidden');
+    elements.spotifyImportModal.style.display = 'none';
+  }
+
+  async function fetchSpotifyLink() {
+    const url = (elements.inputSpotifyUrl?.value || '').trim();
+    if (!url) {
+      elements.inputSpotifyUrl?.focus();
+      return;
+    }
+
+    if (!window.elektronAPI?.importSpotify) {
+      if (elements.spotifyError) {
+        elements.spotifyError.textContent = 'Fitur impor Spotify membutuhkan runtime Electron.';
+        elements.spotifyError.classList.remove('hidden');
+      }
+      return;
+    }
+
+    activeSpotifyImport = null;
+    elements.spotifyError?.classList.add('hidden');
+    elements.spotifyPreview?.classList.add('hidden');
+    elements.spotifyPreviewActions?.classList.add('hidden');
+    elements.spotifyLoading?.classList.remove('hidden');
+    if (elements.btnFetchSpotify) elements.btnFetchSpotify.disabled = true;
+
+    try {
+      const res = await window.elektronAPI.importSpotify(url);
+      elements.spotifyLoading?.classList.add('hidden');
+      if (elements.btnFetchSpotify) elements.btnFetchSpotify.disabled = false;
+
+      if (!res || !res.success) {
+        if (elements.spotifyError) {
+          elements.spotifyError.textContent = res?.error || 'Gagal memuat tautan Spotify.';
+          elements.spotifyError.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const songs = convertSpotifyResultToSongs(res);
+      if (songs.length === 0) {
+        if (elements.spotifyError) {
+          elements.spotifyError.textContent = 'Tidak ada lagu yang ditemukan pada tautan Spotify tersebut.';
+          elements.spotifyError.classList.remove('hidden');
+        }
+        return;
+      }
+
+      activeSpotifyImport = {
+        ...res,
+        songs
+      };
+
+      // Render Preview
+      if (elements.spotifyPreviewType) {
+        elements.spotifyPreviewType.textContent = (res.type || 'playlist').toUpperCase();
+      }
+      if (elements.spotifyPreviewTitle) {
+        elements.spotifyPreviewTitle.textContent = res.title || 'Spotify';
+      }
+      if (elements.spotifyPreviewSub) {
+        elements.spotifyPreviewSub.textContent = res.subtitle || `${songs.length} lagu`;
+      }
+
+      if (res.coverArtUri && elements.spotifyPreviewCover) {
+        elements.spotifyPreviewCover.src = res.coverArtUri;
+        elements.spotifyPreviewCover.classList.remove('hidden');
+        elements.spotifyPreviewCoverFallback?.classList.add('hidden');
+      } else {
+        elements.spotifyPreviewCover?.classList.add('hidden');
+        elements.spotifyPreviewCoverFallback?.classList.remove('hidden');
+      }
+
+      if (elements.spotifyTrackList) {
+        elements.spotifyTrackList.innerHTML = '';
+        songs.forEach((song, idx) => {
+          const item = document.createElement('div');
+          item.className = 'spotify-track-item';
+          item.innerHTML = `
+            <span class="spotify-track-idx">${idx + 1}</span>
+            <div class="spotify-track-info">
+              <span class="spotify-track-title"></span>
+              <span class="spotify-track-artist"></span>
+            </div>
+            <span class="spotify-track-dur">${formatTime(song.duration)}</span>
+          `;
+          item.querySelector('.spotify-track-title').textContent = song.title;
+          item.querySelector('.spotify-track-artist').textContent = song.artist;
+          item.addEventListener('click', () => {
+            rememberTracks(songs);
+            closeSpotifyImportModal();
+            playSong(song, songs, idx);
+          });
+          elements.spotifyTrackList.appendChild(item);
+        });
+      }
+
+      elements.spotifyPreview?.classList.remove('hidden');
+      elements.spotifyPreviewActions?.classList.remove('hidden');
+    } catch (err) {
+      elements.spotifyLoading?.classList.add('hidden');
+      if (elements.btnFetchSpotify) elements.btnFetchSpotify.disabled = false;
+      if (elements.spotifyError) {
+        elements.spotifyError.textContent = `Gagal mengambil data Spotify: ${err?.message || 'Error'}`;
+        elements.spotifyError.classList.remove('hidden');
+      }
+    }
+  }
+
+  elements.btnSidebarSpotify?.addEventListener('click', () => openSpotifyImportModal());
+  elements.btnOnlineImportSpotify?.addEventListener('click', () => openSpotifyImportModal());
+  elements.btnPlImportSpotify?.addEventListener('click', () => openSpotifyImportModal());
+  elements.btnCloseSpotifyModal?.addEventListener('click', closeSpotifyImportModal);
+  elements.btnCancelSpotify?.addEventListener('click', closeSpotifyImportModal);
+  elements.spotifyImportModal?.addEventListener('click', (e) => {
+    if (e.target === elements.spotifyImportModal) closeSpotifyImportModal();
+  });
+  elements.btnFetchSpotify?.addEventListener('click', fetchSpotifyLink);
+  elements.inputSpotifyUrl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      fetchSpotifyLink();
+    }
+  });
+
+  elements.btnSpotifyPlayAll?.addEventListener('click', () => {
+    if (!activeSpotifyImport || !activeSpotifyImport.songs?.length) return;
+    const songs = activeSpotifyImport.songs;
+    rememberTracks(songs);
+    closeSpotifyImportModal();
+    playSong(songs[0], songs, 0);
+  });
+
+  elements.btnSpotifySavePlaylist?.addEventListener('click', () => {
+    if (!activeSpotifyImport || !activeSpotifyImport.songs?.length) return;
+    const songs = activeSpotifyImport.songs;
+    rememberTracks(songs);
+
+    const trackIds = songs.map(s => getSongKey(s)).filter(Boolean);
+    const plName = (activeSpotifyImport.title || 'Playlist Spotify').slice(0, 48);
+    const newPl = {
+      id: 'pl_sp_' + Date.now(),
+      name: plName,
+      coverGradient: GRADIENT_PRESETS[7], // Emerald Mint untuk Spotify
+      trackIds,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    state.playlists.unshift(newPl);
+    savePlaylists();
+    renderPlaylistGrid();
+    closeSpotifyImportModal();
+    openPlaylistDetail(newPl.id);
+    showDownloadToast(`Playlist "${plName}" (${songs.length} lagu) berhasil diimpor!`, 100);
+    hideDownloadToast(2800);
   });
 
   // ─── Downloader Logic (Single Track) ───────────────────────────────────────
@@ -3802,7 +4351,7 @@
     showDownloadToast(`Mengunduh: ${track.title}...`, 5);
 
     try {
-      const result = await window.elektronAPI.downloadTrack(track);
+      const result = await window.elektronAPI.downloadTrack({ ...track, audioQuality: state.audioQuality });
       if (result && result.success) {
         showDownloadToast(`Selesai diunduh: ${track.title}`, 100);
         hideDownloadToast(3000);
@@ -4063,6 +4612,38 @@
       pl_modal_name_label: 'Nama Playlist',
       pl_modal_cover_label: 'Warna Sampul',
       btn_save_pl: 'Simpan Playlist',
+      song_options: 'Opsi lagu',
+      ctx_delete_device: 'Hapus dari perangkat',
+      delete_song_title: 'Hapus Lagu?',
+      delete_song_sub: 'File akan dihapus secara permanen dari komputer',
+      delete_song_confirm_msg: 'Apakah Anda yakin ingin menghapus lagu ini secara permanen dari perangkat?',
+      delete_song_confirm_btn: 'Hapus Permanen',
+      btn_import_spotify: 'Impor Spotify',
+      btn_import_spotify_link: 'Impor Link Spotify',
+      spotify_modal_title: 'Impor dari Spotify',
+      spotify_modal_sub: 'Tempel tautan lagu, album, atau playlist Spotify publik',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: 'Muat',
+      spotify_loading_text: 'Mengambil daftar lagu dari Spotify...',
+      btn_spotify_save_pl: 'Simpan ke Playlist',
+      ctx_play_now: 'Putar sekarang',
+      ctx_play_next: 'Putar berikutnya',
+      ctx_add_queue: 'Tambah ke antrean',
+      ctx_change_cover: 'Ganti foto album...',
+      ctx_reset_cover: 'Kembalikan foto asli',
+      ctx_add_to_pl_sub: 'Tambah ke playlist:',
+      ctx_new_pl: 'Buat playlist baru...',
+      stat_listen_time: 'Waktu Mendengarkan',
+      stat_total_songs: 'Koleksi Lagu',
+      stat_liked_songs: 'Lagu Disukai',
+      recent_played_title: 'Baru Diputar',
+      spotify_charts_title: 'Spotify Charts',
+      spotify_charts_desc: 'Tangga lagu & trending populer',
+      sort_artist: 'Artis (A–Z)',
+      btn_download_all: 'Unduh Semua',
+      about_status: 'Status: Stabil',
+      toast_play_next: 'Diputar berikutnya',
+      toast_added_queue: 'Ditambahkan ke antrean',
       toast_lang_changed: 'Bahasa berhasil diubah ke Bahasa Indonesia'
     },
     en: {
@@ -4199,6 +4780,38 @@
       pl_modal_name_label: 'Playlist Name',
       pl_modal_cover_label: 'Cover Color',
       btn_save_pl: 'Save Playlist',
+      song_options: 'Song options',
+      ctx_delete_device: 'Delete from device',
+      delete_song_title: 'Delete Song?',
+      delete_song_sub: 'The file will be permanently deleted from your computer',
+      delete_song_confirm_msg: 'Are you sure you want to permanently delete this song from your device?',
+      delete_song_confirm_btn: 'Delete Permanently',
+      btn_import_spotify: 'Import Spotify',
+      btn_import_spotify_link: 'Import Spotify Link',
+      spotify_modal_title: 'Import from Spotify',
+      spotify_modal_sub: 'Paste a public Spotify track, album, or playlist link',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: 'Fetch',
+      spotify_loading_text: 'Fetching tracks from Spotify...',
+      btn_spotify_save_pl: 'Save to Playlist',
+      ctx_play_now: 'Play now',
+      ctx_play_next: 'Play next',
+      ctx_add_queue: 'Add to queue',
+      ctx_change_cover: 'Change album cover...',
+      ctx_reset_cover: 'Restore original cover',
+      ctx_add_to_pl_sub: 'Add to playlist:',
+      ctx_new_pl: 'Create new playlist...',
+      stat_listen_time: 'Listening Time',
+      stat_total_songs: 'Music Collection',
+      stat_liked_songs: 'Liked Songs',
+      recent_played_title: 'Recently Played',
+      spotify_charts_title: 'Spotify Charts',
+      spotify_charts_desc: 'Popular charts & trending tracks',
+      sort_artist: 'Artist (A–Z)',
+      btn_download_all: 'Download All',
+      about_status: 'Status: Stable',
+      toast_play_next: 'Playing next',
+      toast_added_queue: 'Added to queue',
       toast_lang_changed: 'Language changed to English'
     },
     zh: {
@@ -4335,6 +4948,38 @@
       pl_modal_name_label: '歌单名称',
       pl_modal_cover_label: '封面渐变色',
       btn_save_pl: '保存歌单',
+      song_options: '歌曲选项',
+      ctx_delete_device: '从设备中删除',
+      delete_song_title: '删除歌曲？',
+      delete_song_sub: '该文件将从您的计算机中永久删除',
+      delete_song_confirm_msg: '您确定要从设备中永久删除这首歌曲吗？',
+      delete_song_confirm_btn: '永久删除',
+      btn_import_spotify: '导入 Spotify',
+      btn_import_spotify_link: '导入 Spotify 链接',
+      spotify_modal_title: '从 Spotify 导入',
+      spotify_modal_sub: '粘贴公开的 Spotify 歌曲、专辑或歌单链接',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: '加载',
+      spotify_loading_text: '正在从 Spotify 获取曲目列表...',
+      btn_spotify_save_pl: '保存为歌单',
+      ctx_play_now: '立即播放',
+      ctx_play_next: '下一首播放',
+      ctx_add_queue: '添加到播放队列',
+      ctx_change_cover: '更换专辑封面...',
+      ctx_reset_cover: '恢复原始封面',
+      ctx_add_to_pl_sub: '添加到歌单：',
+      ctx_new_pl: '新建歌单...',
+      stat_listen_time: '收听时长',
+      stat_total_songs: '音乐收藏',
+      stat_liked_songs: '喜欢的歌曲',
+      recent_played_title: '最近播放',
+      spotify_charts_title: 'Spotify 排行榜',
+      spotify_charts_desc: '热门榜单与流行趋势',
+      sort_artist: '歌手 (A–Z)',
+      btn_download_all: '全部下载',
+      about_status: '状态：稳定版',
+      toast_play_next: '即将下一首播放',
+      toast_added_queue: '已添加到播放队列',
       toast_lang_changed: '已切换语言至 中文'
     },
     pt: {
@@ -4471,6 +5116,38 @@
       pl_modal_name_label: 'Nome da Playlist',
       pl_modal_cover_label: 'Cor da Capa',
       btn_save_pl: 'Salvar Playlist',
+      song_options: 'Opções da música',
+      ctx_delete_device: 'Excluir do dispositivo',
+      delete_song_title: 'Excluir Música?',
+      delete_song_sub: 'O arquivo será excluído permanentemente do seu computador',
+      delete_song_confirm_msg: 'Tem certeza de que deseja excluir permanentemente esta música do dispositivo?',
+      delete_song_confirm_btn: 'Excluir Permanentemente',
+      btn_import_spotify: 'Importar Spotify',
+      btn_import_spotify_link: 'Importar Link Spotify',
+      spotify_modal_title: 'Importar do Spotify',
+      spotify_modal_sub: 'Cole um link público de música, álbum ou playlist do Spotify',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: 'Carregar',
+      spotify_loading_text: 'Buscando músicas do Spotify...',
+      btn_spotify_save_pl: 'Salvar na Playlist',
+      ctx_play_now: 'Tocar agora',
+      ctx_play_next: 'Tocar a seguir',
+      ctx_add_queue: 'Adicionar à fila',
+      ctx_change_cover: 'Alterar capa do álbum...',
+      ctx_reset_cover: 'Restaurar capa original',
+      ctx_add_to_pl_sub: 'Adicionar à playlist:',
+      ctx_new_pl: 'Criar nova playlist...',
+      stat_listen_time: 'Tempo de Reprodução',
+      stat_total_songs: 'Coleção de Músicas',
+      stat_liked_songs: 'Músicas Curtidas',
+      recent_played_title: 'Tocadas Recentemente',
+      spotify_charts_title: 'Spotify Charts',
+      spotify_charts_desc: 'Paradas populares & tendências',
+      sort_artist: 'Artista (A–Z)',
+      btn_download_all: 'Baixar Tudo',
+      about_status: 'Status: Estável',
+      toast_play_next: 'Tocará a seguir',
+      toast_added_queue: 'Adicionado à fila',
       toast_lang_changed: 'Idioma alterado para Português'
     },
     ru: {
@@ -4607,7 +5284,207 @@
       pl_modal_name_label: 'Название плейлиста',
       pl_modal_cover_label: 'Цвет обложки',
       btn_save_pl: 'Сохранить плейлист',
+      song_options: 'Параметры трека',
+      ctx_delete_device: 'Удалить с устройства',
+      delete_song_title: 'Удалить трек?',
+      delete_song_sub: 'Файл будет безвозвратно удалён с вашего компьютера',
+      delete_song_confirm_msg: 'Вы уверены, что хотите навсегда удалить этот трек с устройства?',
+      delete_song_confirm_btn: 'Удалить навсегда',
+      btn_import_spotify: 'Импорт Spotify',
+      btn_import_spotify_link: 'Импорт ссылки Spotify',
+      spotify_modal_title: 'Импорт из Spotify',
+      spotify_modal_sub: 'Вставьте публичную ссылку на трек, альбом или плейлист Spotify',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: 'Загрузить',
+      spotify_loading_text: 'Загрузка треков из Spotify...',
+      btn_spotify_save_pl: 'Сохранить в плейлист',
+      ctx_play_now: 'Воспроизвести сейчас',
+      ctx_play_next: 'Воспроизвести следующим',
+      ctx_add_queue: 'Добавить в очередь',
+      ctx_change_cover: 'Сменить обложку...',
+      ctx_reset_cover: 'Восстановить обложку',
+      ctx_add_to_pl_sub: 'Добавить в плейлист:',
+      ctx_new_pl: 'Создать новый плейлист...',
+      stat_listen_time: 'Время прослушивания',
+      stat_total_songs: 'Коллекция треков',
+      stat_liked_songs: 'Понравившиеся треки',
+      recent_played_title: 'Недавно прослушанные',
+      spotify_charts_title: 'Чарты Spotify',
+      spotify_charts_desc: 'Популярные чарты и тренды',
+      sort_artist: 'Исполнитель (A–Z)',
+      btn_download_all: 'Скачать все',
+      about_status: 'Статус: Стабильно',
+      toast_play_next: 'Будет воспроизведено следующим',
+      toast_added_queue: 'Добавлено в очередь',
       toast_lang_changed: 'Язык переключен на Русский'
+    },
+    ja: {
+      nav_space: 'マイミュージック空間',
+      nav_library: 'ライブラリ',
+      nav_online: 'オンライン探索',
+      nav_favorites: 'お気に入り',
+      nav_downloads: 'ダウンロード',
+      nav_playlists: 'プレイリスト',
+      nav_settings: '設定',
+      btn_add_folder: 'フォルダを追加',
+      btn_dl_url: 'URLからダウンロード',
+      tagline: 'あなたの音楽。あなたの空間。',
+      lib_eyebrow: 'MUSIKKU · ライブラリ',
+      lib_search_placeholder: '曲名、アーティスト、アルバムを検索...',
+      recent_searches: '最近の検索',
+      clear_all: 'すべて消去',
+      popular_suggestions: '人気のキーワード',
+      now_playing_eyebrow: '再生中',
+      now_playing_empty: 'ライブラリまたは探索から曲を選択',
+      collection_title: 'コレクション',
+      play_all: 'すべて再生',
+      quick_add_folder_title: 'フォルダを追加',
+      quick_add_folder_sub: 'コンピュータから音楽をスキャン',
+      quick_dl_title: 'URLからダウンロード',
+      quick_dl_sub: 'リンクを貼り付けてオフライン保存',
+      empty_lib_title: 'ライブラリが空です',
+      empty_lib_desc: '音楽フォルダを追加して再生を始めましょう。',
+      explore_eyebrow: '何百万曲もの音楽をストリーミング',
+      explore_heading: '探索',
+      explore_search_placeholder: '音楽を検索 (SZA, Daniel Caesar, J-Popなど)...',
+      source_youtube: 'YouTube Music',
+      source_jamendo: 'Jamendo (著作権フリー)',
+      tuner_eyebrow: 'ジャンルチューナー',
+      active_channel: '選択中:',
+      empty_search_title: '音楽を検索',
+      empty_search_desc: '上部の検索バーに曲名やアーティスト名を入力してください。',
+      load_more: 'もっと読み込む',
+      fav_eyebrow: 'お気に入り',
+      fav_title: 'お気に入り',
+      fav_search_placeholder: 'お気に入りから検索...',
+      empty_fav_eyebrow: 'お気に入りなし',
+      empty_fav_title: 'お気に入りの曲が<br />まだありません',
+      empty_fav_desc: '曲のハートアイコンをクリックしてお気に入りに追加しましょう。',
+      btn_fav_explore: 'オンライン音楽を探索',
+      btn_fav_lib: 'ライブラリを開く',
+      dl_breadcrumb: 'ライブラリ / ダウンロード',
+      dl_search_placeholder: 'ダウンロード済みを検索...',
+      dl_tag: 'オフライン再生可能',
+      dl_hero_heading: 'お気に入りの音楽。<br>オフラインでも。',
+      dl_hero_sub: 'ダウンロードした曲はすべてここに保存されます。',
+      dl_card_title: 'ダウンロード済みの曲',
+      dl_open_folder: 'フォルダを開く',
+      sort_recent: '最新順',
+      sort_title: 'タイトル (A–Z)',
+      sort_duration: '再生時間',
+      sort_name: '名前順 (A–Z)',
+      sort_artist: 'アーティスト (A–Z)',
+      dl_th_title: '曲名',
+      dl_th_source: 'ソース',
+      dl_th_dur: '時間',
+      dl_empty_title: 'ダウンロードした曲はありません',
+      dl_empty_desc: '「オンライン探索」タブやURLダウンロードから曲をオフライン保存できます。',
+      dl_footer_note: 'デバイスに保存済み。インターネットなしでも再生できます。',
+      pl_eyebrow: 'プレイリスト',
+      pl_title: 'プレイリスト',
+      pl_search_placeholder: 'プレイリストを検索...',
+      btn_new_pl: '新規プレイリスト',
+      btn_back_pl: 'すべてのプレイリスト',
+      pl_detail_songs: 'プレイリストの曲',
+      btn_add_to_pl_picker: 'ライブラリから曲を追加',
+      settings_eyebrow: 'MUSIKKU · 設定',
+      settings_title: '設定',
+      settings_badge: '設定とシステム',
+      settings_theme_title: 'テーマと外観',
+      settings_theme_desc: 'お好みのビジュアルスタイルを選択',
+      settings_lang_title: 'アプリ言語',
+      settings_lang_desc: 'MusikKu の表示言語を選択してください',
+      settings_audio_title: '再生とオーディオ',
+      settings_audio_desc: 'スリープタイマーと再生設定を管理',
+      settings_timer_title: 'スリープタイマー',
+      settings_timer_sub: '時間になると自動的に音楽を一時停止 · オフ',
+      settings_timer_off: 'オフ',
+      settings_autoplay_title: '次の曲を自動再生',
+      settings_autoplay_sub: '再生終了後、キュー内の次の曲を自動的に再生します',
+      settings_quality_title: 'オンライン音質',
+      settings_quality_sub: '高音質とデータ節約のバランスを選択',
+      quality_high: '高音質 (256 - 320 kbps)',
+      quality_std: '標準 (160 kbps)',
+      quality_low: 'データ節約 (96 kbps)',
+      settings_folders_title: '音楽フォルダとストレージ',
+      settings_folders_desc: 'ローカル音楽ファイルをスキャンするフォルダ',
+      btn_settings_add_folder: 'フォルダを追加',
+      btn_settings_rescan: 'ライブラリを再スキャン',
+      btn_settings_open_dl: 'ダウンロードフォルダを開く',
+      settings_shortcuts_title: 'キーボードショートカット',
+      settings_shortcuts_desc: 'マウスなしで素早く再生コントロール',
+      shortcut_play_pause: '再生 / 一時停止',
+      shortcut_next: '次の曲',
+      shortcut_prev: '前の曲',
+      shortcut_vol: '音量 上げる / 下げる',
+      shortcut_mute: 'ミュート切替',
+      shortcut_fav: '現在の曲をお気に入り登録',
+      shortcut_repeat: 'リピートモード切替',
+      settings_data_title: 'データとクリーニング',
+      settings_data_desc: 'ローカルキャッシュと検索履歴を管理',
+      settings_clear_searches_title: '検索履歴',
+      settings_clear_searches_sub: 'ライブラリとオンラインの検索履歴をすべて消去',
+      btn_settings_clear_history: '履歴を消去',
+      settings_reset_title: '設定をリセット',
+      settings_reset_sub: 'テーマや再生設定を初期状態に戻します',
+      btn_settings_reset: '設定をリセット',
+      about_app_desc: 'フロストグラスモーフィズムとレコード盤ダイヤルを備えたモダンな音楽プレイヤー。オフライン再生、ストリーミング、同期歌詞、ダウンロードに対応。',
+      np_close: 'プレイヤーを閉じる',
+      change_photo: '画像を変更',
+      np_playing_eyebrow: '再生中',
+      np_tab_queue: 'キュー',
+      np_tab_lyrics: '歌詞',
+      np_lrc_loading: 'LRCLIB から歌詞を読み込み中...',
+      np_lrc_empty: 'この曲の歌詞は見つかりませんでした',
+      np_lrc_hint: '行をクリックするとその位置へジャンプします。',
+      np_lrc_follow: '自動スクロール',
+      np_queue_now: '再生中',
+      np_save_queue_pl: 'キューをプレイリストに保存',
+      np_clear_queue: 'キューを空にする',
+      dl_modal_title: '音楽ダウンロードツール',
+      dl_modal_sub: 'URLから音声ファイルを直接ダウンロード',
+      dl_modal_url_label: '音声URL (MP3 / ダイレクトストリーム) *',
+      dl_modal_title_label: '曲名',
+      dl_modal_artist_label: 'アーティスト名',
+      btn_cancel: 'キャンセル',
+      btn_start_dl: 'ダウンロード開始',
+      pl_modal_title: '新規プレイリスト',
+      pl_modal_sub: 'お気に入りの曲をまとめよう',
+      pl_modal_name_label: 'プレイリスト名',
+      pl_modal_cover_label: 'カバーカラー',
+      btn_save_pl: 'プレイリストを保存',
+      song_options: '曲のオプション',
+      ctx_delete_device: 'デバイスから削除',
+      delete_song_title: '曲を削除しますか？',
+      delete_song_sub: 'ファイルはコンピュータから完全に削除されます',
+      delete_song_confirm_msg: 'この曲をデバイスから完全に削除してもよろしいですか？',
+      delete_song_confirm_btn: '完全に削除',
+      btn_import_spotify: 'Spotify インポート',
+      btn_import_spotify_link: 'Spotify リンクをインポート',
+      spotify_modal_title: 'Spotify からインポート',
+      spotify_modal_sub: '公開されている Spotify の曲・アルバム・プレイリストのリンクを貼り付け',
+      spotify_url_placeholder: 'https://open.spotify.com/playlist/...',
+      btn_fetch_spotify: '読み込む',
+      spotify_loading_text: 'Spotify から曲リストを取得中...',
+      btn_spotify_save_pl: 'プレイリストに保存',
+      ctx_play_now: '今すぐ再生',
+      ctx_play_next: '次に再生',
+      ctx_add_queue: 'キューに追加',
+      ctx_change_cover: 'カバー画像を変更...',
+      ctx_reset_cover: '元の画像に戻す',
+      ctx_add_to_pl_sub: 'プレイリストに追加:',
+      ctx_new_pl: '新規プレイリストを作成...',
+      stat_listen_time: '再生時間',
+      stat_total_songs: '音楽コレクション',
+      stat_liked_songs: 'お気に入りの曲',
+      recent_played_title: '最近再生した曲',
+      spotify_charts_title: 'Spotify チャート',
+      spotify_charts_desc: '人気チャート＆トレンド',
+      btn_download_all: 'すべてダウンロード',
+      about_status: 'ステータス: 安定版',
+      toast_play_next: '次に再生します',
+      toast_added_queue: 'キューに追加しました',
+      toast_lang_changed: '言語を日本語に変更しました'
     }
   };
 
@@ -4790,11 +5667,12 @@
       const dlFolder = await window.elektronAPI?.getDownloadsFolder();
       if (dlFolder) {
         const dlFiles = await scanFolder(dlFolder);
+        state.downloadedSongs = dlFiles.map(f => ({ ...f, isDownloaded: true }));
+        saveDownloads();
         if (dlFiles.length > 0) {
-          state.downloadedSongs = dlFiles.map(f => ({ ...f, isDownloaded: true }));
-          saveDownloads();
           mergeSongs(dlFiles);
         }
+        updateDownloadsCountBadge();
       }
     } catch (e) {
       console.warn('Gagal memindai folder unduhan:', e);
@@ -4852,6 +5730,7 @@
           const langNames = {
             id: 'Bahasa Indonesia',
             en: 'English',
+            ja: '日本語',
             zh: 'Mandarin (中文)',
             pt: 'Português',
             ru: 'Русский'
@@ -4953,6 +5832,212 @@
     });
   }
 
+  const DEFAULT_SPOTIFY_CHARTS = [
+    {
+      id: '37i9dQZEVXbObFQZ3JLcXt',
+      title: 'Top 50 - Indonesia',
+      desc: 'Update harian lagu paling sering diputar di Indonesia',
+      cover: 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_id_default.jpg',
+      badge: 'NO. 1 INDONESIA',
+      grad: 'linear-gradient(135deg, #1DB954, #0C3D1B)'
+    },
+    {
+      id: '37i9dQZF1DXa2EiKmMLhFD',
+      title: 'Hot Hits Indonesia',
+      desc: 'Lagu-lagu terpanas dan terfavorit saat ini',
+      cover: 'https://i.scdn.co/image/ab67706f000000024c0f879869b8da15659b8cea',
+      badge: 'HOT HITS',
+      grad: 'linear-gradient(135deg, #FF5722, #5A1C08)'
+    },
+    {
+      id: '37i9dQZF1DWWhB4HOWKFQc',
+      title: 'Lagi Viral',
+      desc: 'Deretan lagu yang sedang viral & tren di sosmed',
+      cover: 'https://i.scdn.co/image/ab67706f000000024c5b4a8f1e4e19720293fd6b',
+      badge: 'LAGI VIRAL',
+      grad: 'linear-gradient(135deg, #8338EC, #2C1052)'
+    },
+    {
+      id: '37i9dQZF1DX6yQB7bkflag',
+      title: 'Pop Rising Indonesia',
+      desc: 'Bintang pop baru Indonesia yang sedang bersinar',
+      cover: 'https://i.scdn.co/image/ab67706f000000029f3cc3d3846f7328394e2eca',
+      badge: 'POP RISING',
+      grad: 'linear-gradient(135deg, #06D6A0, #024231)'
+    },
+    {
+      id: '37i9dQZF1DXcBWIGoYBM5M',
+      title: "Today's Top Hits",
+      desc: 'Hits internasional paling populer hari ini',
+      cover: 'https://i.scdn.co/image/ab67706f00000002ffe80c69d2e795ea01e63447',
+      badge: 'TOP HITS',
+      grad: 'linear-gradient(135deg, #FF006E, #590026)'
+    },
+    {
+      id: '37i9dQZEVXbMDoHDwVN2tF',
+      title: 'Top 50 - Global',
+      desc: 'Lagu nomor satu terpopuler dari seluruh dunia',
+      cover: 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_global_default.jpg',
+      badge: 'GLOBAL TOP',
+      grad: 'linear-gradient(135deg, #3A86FF, #102E66)'
+    }
+  ];
+
+  function renderSpotifyCharts() {
+    if (!elements.spotifyChartsRow) return;
+    elements.spotifyChartsRow.innerHTML = '';
+    DEFAULT_SPOTIFY_CHARTS.forEach(chart => {
+      const card = document.createElement('div');
+      card.className = 'spotify-chart-card';
+      card.innerHTML = `
+        <div class="spotify-chart-art" style="background: ${chart.grad};">
+          <img src="${chart.cover}" alt="" loading="lazy" />
+          <span class="spotify-chart-badge">${chart.badge}</span>
+          <div class="spotify-chart-play">
+            <span class="material-icons-round" style="font-size:20px;">play_arrow</span>
+          </div>
+        </div>
+        <div class="spotify-chart-title"></div>
+        <div class="spotify-chart-desc"></div>
+      `;
+      const img = card.querySelector('img');
+      if (img) img.onerror = () => { img.style.display = 'none'; };
+      card.querySelector('.spotify-chart-title').textContent = chart.title;
+      card.querySelector('.spotify-chart-desc').textContent = chart.desc;
+      card.addEventListener('click', () => {
+        openSpotifyImportModal(`https://open.spotify.com/playlist/${chart.id}`, true);
+      });
+      elements.spotifyChartsRow.appendChild(card);
+    });
+  }
+
+  function formatListeningStatsDuration(totalSeconds) {
+    const secs = Math.max(0, Math.floor(totalSeconds || 0));
+    const hours = Math.floor(secs / 3600);
+    const mins = Math.floor((secs % 3600) / 60);
+    if (hours > 0) return `${hours} jam ${mins} menit`;
+    return `${mins} menit`;
+  }
+
+  function saveListeningStats() {
+    try {
+      localStorage.setItem('musikku_stats_v1', JSON.stringify(state.listeningStats));
+    } catch (_) {}
+  }
+
+  function recordRecentlyPlayed(song) {
+    if (!song) return;
+    rememberTracks([song]);
+    const key = getSongKey(song);
+    if (!key) return;
+    const list = Array.isArray(state.recentlyPlayed) ? state.recentlyPlayed : [];
+    const filtered = list.filter(item => getSongKey(item) !== key);
+    filtered.unshift({
+      id: song.id,
+      title: song.title || 'Unknown Title',
+      artist: song.artist || 'Unknown Artist',
+      album: song.album || '',
+      duration: song.duration || 0,
+      cover: song.cover || '',
+      path: song.path || '',
+      streamUrl: song.streamUrl || '',
+      sourceUrl: song.sourceUrl || '',
+      youtubeId: song.youtubeId || '',
+      isOnline: Boolean(song.isOnline),
+      isDownloaded: Boolean(song.isDownloaded),
+      source: song.source || ''
+    });
+    state.recentlyPlayed = filtered.slice(0, 12);
+    try {
+      localStorage.setItem('musikku_recently_played_v1', JSON.stringify(state.recentlyPlayed));
+    } catch (_) {}
+    renderLibraryInsights();
+  }
+
+  function renderLibraryInsights() {
+    if (elements.statListenTime) {
+      elements.statListenTime.textContent = formatListeningStatsDuration(state.listeningStats?.totalSeconds || 0);
+    }
+    if (elements.statTotalSongs) {
+      elements.statTotalSongs.textContent = `${state.allSongs.length} lagu`;
+    }
+    if (elements.statLikedSongs) {
+      const favCount = state.favoriteSongs ? state.favoriteSongs.size : state.favorites.size;
+      elements.statLikedSongs.textContent = `${favCount} lagu`;
+    }
+
+    if (!elements.recentPlayedSection || !elements.recentPlayedList) return;
+    const recent = Array.isArray(state.recentlyPlayed) ? state.recentlyPlayed : [];
+    if (recent.length === 0) {
+      elements.recentPlayedSection.classList.add('hidden');
+      elements.recentPlayedList.innerHTML = '';
+      return;
+    }
+
+    elements.recentPlayedSection.classList.remove('hidden');
+    elements.recentPlayedList.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    recent.forEach((song, idx) => {
+      const card = document.createElement('div');
+      card.className = 'recent-played-card';
+      const coverUrl = getSongCover(song);
+      card.innerHTML = `
+        <div class="recent-played-cover" style="${coverUrl ? '' : `background:${getGradientStyle(song.title || song.artist)}`}">
+          ${coverUrl ? `<img src="${coverUrl}" alt="" loading="lazy" />` : `<span class="material-icons-round" style="font-size:32px;color:rgba(255,255,255,0.85);">music_note</span>`}
+          <div class="recent-played-play-badge">
+            <span class="material-icons-round" style="font-size:18px;">play_arrow</span>
+          </div>
+        </div>
+        <span class="recent-played-title"></span>
+        <span class="recent-played-artist"></span>
+      `;
+      const img = card.querySelector('img');
+      if (img) {
+        img.onerror = () => {
+          img.replaceWith(Object.assign(document.createElement('span'), {
+            className: 'material-icons-round',
+            textContent: 'music_note',
+            style: 'font-size:32px;color:rgba(255,255,255,0.85);'
+          }));
+        };
+      }
+      card.querySelector('.recent-played-title').textContent = song.title || 'Unknown Title';
+      card.querySelector('.recent-played-artist').textContent = song.artist || 'Unknown Artist';
+      card.addEventListener('click', () => {
+        playSong(song, recent, idx);
+      });
+      fragment.appendChild(card);
+    });
+    elements.recentPlayedList.appendChild(fragment);
+  }
+
+  elements.btnClearRecentPlayed?.addEventListener('click', () => {
+    state.recentlyPlayed = [];
+    localStorage.removeItem('musikku_recently_played_v1');
+    renderLibraryInsights();
+  });
+
+  // Catat waktu mendengarkan setiap 1 detik saat lagu berputar
+  let statsTickCounter = 0;
+  setInterval(() => {
+    if (state.isPlaying && !audio.paused) {
+      if (!state.listeningStats || typeof state.listeningStats !== 'object') {
+        state.listeningStats = { totalSeconds: 0, daily: {} };
+      }
+      state.listeningStats.totalSeconds = (state.listeningStats.totalSeconds || 0) + 1;
+      const todayKey = new Date().toISOString().slice(0, 10);
+      if (!state.listeningStats.daily) state.listeningStats.daily = {};
+      state.listeningStats.daily[todayKey] = (state.listeningStats.daily[todayKey] || 0) + 1;
+      statsTickCounter += 1;
+      if (statsTickCounter % 10 === 0) {
+        saveListeningStats();
+        if (elements.statListenTime) {
+          elements.statListenTime.textContent = formatListeningStatsDuration(state.listeningStats.totalSeconds);
+        }
+      }
+    }
+  }, 1000);
+
   // ─── App Initialization ────────────────────────────────────────────────────
   async function init() {
     applyTheme(state.theme);
@@ -4960,6 +6045,8 @@
     setupSettingsEventListeners();
     migratePlaylistsIfNeeded();
     renderTunerStops();
+    renderSpotifyCharts();
+    renderLibraryInsights();
 
     if (!window.elektronAPI) {
       console.warn('Electron API tidak terdeteksi. Berjalan dalam mode web preview.');
@@ -4984,11 +6071,12 @@
       const dlFolder = await window.elektronAPI.getDownloadsFolder();
       if (dlFolder) {
         const dlFiles = await scanFolder(dlFolder);
+        state.downloadedSongs = dlFiles.map(f => ({ ...f, isDownloaded: true }));
+        saveDownloads();
         if (dlFiles.length > 0) {
-          state.downloadedSongs = dlFiles.map(f => ({ ...f, isDownloaded: true }));
-          saveDownloads();
           mergeSongs(dlFiles);
         }
+        updateDownloadsCountBadge();
       }
     } catch (e) {
       console.warn('Could not auto-scan downloads:', e);

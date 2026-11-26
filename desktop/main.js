@@ -45,12 +45,22 @@ function getYtDlpCommand() {
   return 'yt-dlp';
 }
 
-function resolveDirectAudioUrl(url) {
+function getYtDlpFormatSelector(quality = 'standard', preferM4a = false) {
+  if (quality === 'high') {
+    return preferM4a ? 'ba[ext=m4a]/ba/b' : 'ba[abr>=192]/ba/b';
+  }
+  if (quality === 'saver') {
+    return preferM4a ? 'ba[abr<=96][ext=m4a]/ba[abr<=96]/wa/ba/b' : 'ba[abr<=96]/wa/ba/b';
+  }
+  return preferM4a ? 'ba[abr<=160][ext=m4a]/ba[ext=m4a]/ba/b' : 'ba[abr<=160]/ba/b';
+}
+
+function resolveDirectAudioUrl(url, audioQuality = 'standard') {
   return new Promise((resolve) => {
     const ytdlpBin = getYtDlpCommand();
     const args = [
       '--extractor-args', 'youtube:player_client=web,mweb,android',
-      '-f', 'ba/b',
+      '-f', getYtDlpFormatSelector(audioQuality, false),
       '-g',
       url
     ];
@@ -421,6 +431,85 @@ ipcMain.handle('get-default-music-path', () => {
 // ─── Online Streaming & Downloader Tools ─────────────────────────────────────
 const JAMENDO_CLIENT_ID = 'dde1e7c5';
 
+function fetchText(url, headers = {}, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 5) return reject(new Error('Too many redirects'));
+    try {
+      const parsed = new URL(url);
+      const client = parsed.protocol === 'http:' ? http : https;
+      const options = {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'http:' ? 80 : 443),
+        path: parsed.pathname + parsed.search,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+          ...headers
+        },
+        timeout: 12000
+      };
+      const req = client.get(options, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const nextUrl = new URL(res.headers.location, url).href;
+          return fetchText(nextUrl, headers, redirectCount + 1).then(resolve).catch(reject);
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(data));
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function parseSpotifyLink(input) {
+  const match = String(input || '').trim().match(
+    /(?:https?:\/\/(?:open|play)\.spotify\.com\/(?:intl-[a-zA-Z-]+\/)?(?:user\/[^/]+\/)?|spotify:)(track|playlist|album)[:/]([a-zA-Z0-9]+)/i
+  );
+  if (!match) return null;
+  return { type: match[1].toLowerCase(), id: match[2] };
+}
+
+function extractSpotifyCoverArt(entity) {
+  const images = entity?.visualIdentity?.image;
+  if (!Array.isArray(images)) return null;
+  let bestUrl = null;
+  let maxDim = 0;
+  for (const img of images) {
+    if (!img || !img.url) continue;
+    const dim = Math.max(img.maxWidth || 0, img.maxHeight || 0);
+    if (dim >= maxDim) {
+      maxDim = dim;
+      bestUrl = img.url;
+    }
+  }
+  return bestUrl;
+}
+
+function extractSpotifyTrackList(entity, defaultCover) {
+  const trackList = entity?.trackList;
+  if (!Array.isArray(trackList)) return [];
+  return trackList.map((item, idx) => {
+    const uri = item?.uri || '';
+    const trackId = uri.startsWith('spotify:track:') ? uri.slice('spotify:track:'.length) : `${idx}`;
+    return {
+      id: trackId,
+      title: item?.title || `Lagu ${idx + 1}`,
+      artist: item?.subtitle || 'Artis Tidak Diketahui',
+      durationMs: Number(item?.duration) || 0,
+      coverArtUri: defaultCover || null,
+      spotifyUri: uri
+    };
+  });
+}
+
 function fetchJson(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 4) return reject(new Error('Too many redirects'));
@@ -432,7 +521,7 @@ function fetchJson(url, redirectCount = 0) {
         port: parsed.port || (parsed.protocol === 'http:' ? 80 : 443),
         path: parsed.pathname + parsed.search,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MusikKu-Desktop/1.0.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MusikKu-Desktop/1.2.0',
           'Accept': 'application/json'
         },
         timeout: 8000
@@ -803,10 +892,35 @@ ipcMain.handle('resolve-stream-url', async (_event, targetOrSong) => {
 
   if (typeof targetOrSong === 'object' && targetOrSong !== null) {
     targetIdOrUrl = targetOrSong.sourceUrl || targetOrSong.youtubeId || targetOrSong.streamUrl || '';
-    fallbackQuery = `${targetOrSong.title || ''} ${targetOrSong.artist || ''}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
+    fallbackQuery = `${targetOrSong.artist || ''} - ${targetOrSong.title || ''}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
   } else {
     targetIdOrUrl = String(targetOrSong);
   }
+
+  // Jangan gunakan URI spotify: atau link halaman open.spotify.com secara langsung sebagai URL audio
+  if (targetIdOrUrl.startsWith('spotify:') || targetIdOrUrl.includes('open.spotify.com')) {
+    targetIdOrUrl = '';
+  }
+
+  // Jika URL belum tersedia (misal lagu hasil impor Spotify), cari kecocokan di YouTube / SoundCloud
+  if (!targetIdOrUrl && fallbackQuery) {
+    try {
+      const ytMatches = await searchYouTube(fallbackQuery, 1);
+      if (Array.isArray(ytMatches) && ytMatches.length > 0) {
+        targetIdOrUrl = ytMatches[0].sourceUrl || ytMatches[0].youtubeId || '';
+      }
+      if (!targetIdOrUrl) {
+        const scMatches = await searchSoundCloud(fallbackQuery, 1);
+        if (Array.isArray(scMatches) && scMatches.length > 0) {
+          targetIdOrUrl = scMatches[0].sourceUrl || '';
+        }
+      }
+    } catch (e) {
+      console.warn('[resolve-stream-url] Pencarian lagu fallback gagal:', e.message);
+    }
+  }
+
+  if (!targetIdOrUrl) return '';
 
   // Jika sudah URL proxy aktif lengkap dengan query, kembalikan langsung
   if (targetIdOrUrl.startsWith('http://127.0.0.1') && targetIdOrUrl.includes('/stream?url=')) {
@@ -828,8 +942,9 @@ ipcMain.handle('resolve-stream-url', async (_event, targetOrSong) => {
 
   // 1. Prioritas: Coba dapatkan direct CDN URL (googlevideo / sndcdn) via yt-dlp -g
   // Direct CDN URL langsung di-stream oleh HTML5 audio tanpa beban proxy lokal (bisa scrubbing & fast buffer)
+  const audioQuality = (typeof targetOrSong === 'object' && targetOrSong?.audioQuality) || 'standard';
   try {
-    const directUrl = await resolveDirectAudioUrl(url);
+    const directUrl = await resolveDirectAudioUrl(url, audioQuality);
     if (directUrl && directUrl.startsWith('http')) {
       console.log('[resolve-stream-url] Direct CDN stream URL berhasil didapatkan');
       return directUrl;
@@ -947,11 +1062,25 @@ ipcMain.handle('online-download', async (_event, track) => {
   }
 
   // Retrieve raw target URL from any available field
-  const rawUrl = (track.sourceUrl || track.downloadUrl || track.streamUrl || track.path || (track.youtubeId ? `https://www.youtube.com/watch?v=${track.youtubeId}` : '')).trim();
-  if (!rawUrl) throw new Error('URL unduhan tidak ditemukan');
+  let rawUrl = (track.sourceUrl || track.downloadUrl || track.streamUrl || track.path || (track.youtubeId ? `https://www.youtube.com/watch?v=${track.youtubeId}` : '')).trim();
+  if (rawUrl.startsWith('spotify:') || rawUrl.includes('open.spotify.com')) {
+    rawUrl = '';
+  }
 
   let title = (track.title || '').trim();
   let artist = (track.artist || '').trim();
+
+  if (!rawUrl && title) {
+    const searchQ = `${artist && artist !== 'Unknown Artist' ? artist + ' ' : ''}${title}`.trim();
+    const ytMatches = await searchYouTube(searchQ, 1);
+    if (Array.isArray(ytMatches) && ytMatches.length > 0 && ytMatches[0].sourceUrl) {
+      rawUrl = ytMatches[0].sourceUrl;
+    } else {
+      rawUrl = `ytsearch1:${searchQ}`;
+    }
+  }
+
+  if (!rawUrl) throw new Error('URL unduhan tidak ditemukan');
 
   // If it's a YouTube URL, extract videoId and fetch metadata if title/artist are missing or generic
   const ytMatch = rawUrl.match(/(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]{11})/i);
@@ -980,9 +1109,11 @@ ipcMain.handle('online-download', async (_event, track) => {
     !rawUrl.includes('youtu') && !rawUrl.includes('soundcloud');
 
   if (!isDirectAudio) {
-    const targetSource = rawUrl.startsWith('http') ? rawUrl : `https://www.youtube.com/watch?v=${rawUrl}`;
+    const isSearchSource = rawUrl.startsWith('ytsearch') || rawUrl.startsWith('scsearch');
+    const targetSource = (rawUrl.startsWith('http') || isSearchSource) ? rawUrl : `https://www.youtube.com/watch?v=${rawUrl}`;
     const fileName = `${safeArtist} - ${safeTitle}.m4a`;
     const targetPath = path.join(downloadsDir, fileName);
+    const dlFormat = getYtDlpFormatSelector(track?.audioQuality || 'standard', true);
 
     return new Promise((resolve, reject) => {
       mainWindow?.webContents.send('download-progress', { id: track.id, progress: 20, status: 'downloading' });
@@ -990,17 +1121,17 @@ ipcMain.handle('online-download', async (_event, track) => {
       const fallbackQ = `${artist} ${title}`.replace(/[/\\?%*:|"<>]/g, ' ').replace(/\s+/g, ' ').trim();
 
       function execDownload(source, isFallback = false) {
-        const dlArgs = isFallback
+        const dlArgs = (isFallback || isSearchSource)
           ? [
               '--match-filter', 'duration > 45 & duration < 900',
-              '-f', 'ba[ext=m4a]/ba/b',
+              '-f', dlFormat,
               '--max-downloads', '1',
               '-o', targetPath,
               source
             ]
           : [
               '--extractor-args', 'youtube:player_client=web,mweb,android',
-              '-f', 'ba[ext=m4a]/ba/b',
+              '-f', dlFormat,
               '-o', targetPath,
               source
             ];
@@ -1158,6 +1289,123 @@ ipcMain.handle('get-downloads-folder', () => {
     fs.mkdirSync(downloadsDir, { recursive: true });
   }
   return downloadsDir;
+});
+
+// 5. Permanently delete local or downloaded audio file from disk
+ipcMain.handle('delete-song-file', async (_event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') {
+    return { success: false, error: 'Path file tidak valid.' };
+  }
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: true, alreadyMissing: true };
+    }
+    await fs.promises.unlink(filePath);
+    return { success: true };
+  } catch (err) {
+    console.error('Gagal menghapus file audio:', err);
+    return { success: false, error: err?.message || 'Gagal menghapus file.' };
+  }
+});
+
+// 6. Import Spotify Public Track / Album / Playlist Metadata via Embed Endpoint
+ipcMain.handle('import-spotify', async (_event, urlOrUri) => {
+  const parsed = parseSpotifyLink(urlOrUri);
+  if (!parsed) {
+    return { success: false, error: 'Tautan Spotify tidak dikenali atau tidak valid. Gunakan link open.spotify.com/playlist/..., album/..., atau track/...' };
+  }
+
+  const { type, id } = parsed;
+  const embedUrl = `https://open.spotify.com/embed/${type}/${id}`;
+
+  try {
+    const html = await fetchText(embedUrl);
+    const nextMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!nextMatch || !nextMatch[1]) {
+      return { success: false, error: 'Data konten Spotify tidak ditemukan pada halaman embed.' };
+    }
+
+    const rootJson = JSON.parse(nextMatch[1]);
+    const entity = rootJson?.props?.pageProps?.state?.data?.entity;
+
+    if (!entity) {
+      if (type === 'track') {
+        try {
+          const oembed = await fetchJson(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${id}`);
+          if (oembed && oembed.title) {
+            const parts = oembed.title.split(' by ');
+            const title = parts[0].trim() || 'Lagu Spotify';
+            const artist = (parts[1] || '').trim() || 'Artis Spotify';
+            const cover = oembed.thumbnail_url || null;
+            return {
+              success: true,
+              type: 'track',
+              id,
+              title,
+              subtitle: artist,
+              coverArtUri: cover,
+              originalUrl: urlOrUri,
+              tracks: [{
+                id,
+                title,
+                artist,
+                durationMs: 0,
+                coverArtUri: cover,
+                spotifyUri: `spotify:track:${id}`
+              }]
+            };
+          }
+        } catch (_) {}
+      }
+      return { success: false, error: 'Konten Spotify tidak ditemukan atau link bersifat privat.' };
+    }
+
+    const coverArtUri = extractSpotifyCoverArt(entity);
+
+    if (type === 'track') {
+      const title = entity.title || entity.name || 'Tanpa Judul';
+      const artists = Array.isArray(entity.artists)
+        ? entity.artists.map(a => a?.name).filter(Boolean).join(', ')
+        : '';
+      const artist = artists || entity.subtitle || 'Artis Tidak Diketahui';
+      const durationMs = Number(entity.duration) || 0;
+      const spotifyUri = entity.uri || `spotify:track:${id}`;
+      return {
+        success: true,
+        type: 'track',
+        id,
+        title,
+        subtitle: artist,
+        coverArtUri,
+        originalUrl: urlOrUri,
+        tracks: [{
+          id,
+          title,
+          artist,
+          durationMs,
+          coverArtUri,
+          spotifyUri
+        }]
+      };
+    }
+
+    const tracks = extractSpotifyTrackList(entity, coverArtUri);
+    const title = (type === 'playlist' ? (entity.name || entity.title) : (entity.title || entity.name)) || (type === 'playlist' ? 'Playlist Spotify' : 'Album Spotify');
+    const subPrefix = entity.subtitle || (type === 'playlist' ? 'Spotify Playlist' : 'Artis Tidak Diketahui');
+    return {
+      success: true,
+      type,
+      id,
+      title,
+      subtitle: `${subPrefix} • ${tracks.length} lagu`,
+      coverArtUri,
+      originalUrl: urlOrUri,
+      tracks
+    };
+  } catch (err) {
+    console.error('[import-spotify] Error:', err);
+    return { success: false, error: `Gagal mengambil data dari Spotify (${err?.message || 'Error'}). Pastikan link publik & koneksi internet aktif.` };
+  }
 });
 
 // App lifecycle

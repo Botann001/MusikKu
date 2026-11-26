@@ -48,8 +48,8 @@ npm start
 cd desktop
 npm run build
 ```
-File installer `MusikKu Setup 1.0.0.exe` dan portable `MusikKu-Desktop-1.0.0-portable.exe` akan berada di folder `desktop/dist/`.
+File installer `MusikKu Setup 1.2.0.exe` dan portable `MusikKu-Desktop-1.2.0-portable.exe` akan berada di folder `desktop/dist/`.
 
 ### 3. File Hasil Build yang Siap Digunakan
-- **Installer**: `desktop/dist/MusikKu Setup 1.0.0.exe` (~82 MB)
-- **Portable**: `desktop/dist/MusikKu-Desktop-1.0.0-portable.exe` (~81 MB)
+- **Installer**: `desktop/dist/MusikKu Setup 1.2.0.exe` (~100 MB)
+- **Portable**: `desktop/dist/MusikKu-Desktop-1.2.0-portable.exe` (~100 MB)

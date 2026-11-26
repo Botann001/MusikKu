@@ -1,6 +1,6 @@
 {
   "name": "musikku-desktop",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "MusikKu Desktop — Modern music player with light sky blue & frosted glassmorphism UI",
   "main": "main.js",
   "scripts": {

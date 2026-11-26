@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('elektronAPI', {
   downloadTrack: (track) => ipcRenderer.invoke('online-download', track),
   openDownloadsFolder: () => ipcRenderer.invoke('open-downloads-folder'),
   getDownloadsFolder: () => ipcRenderer.invoke('get-downloads-folder'),
+  deleteSongFile: (filePath) => ipcRenderer.invoke('delete-song-file', filePath),
+  importSpotify: (url) => ipcRenderer.invoke('import-spotify', url),
   onDownloadProgress: (callback) => {
     ipcRenderer.on('download-progress', (_event, data) => callback(data));
   }

@@ -259,7 +259,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
                 .padding(bottom = 24.dp)
         ) {
             Text(
-                text = "VERSION 1.0.0",
+                text = "VERSION ${com.example.musikku.BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White.copy(alpha = 0.35f),

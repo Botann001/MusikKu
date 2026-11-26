@@ -83,6 +83,10 @@
           <span class="material-icons-round">link</span>
           <span data-i18n="btn_dl_url">Download dari URL</span>
         </button>
+        <button id="btn-sidebar-spotify" class="btn-sidebar-spotify" title="Impor Link Spotify" aria-label="Impor dari Spotify">
+          <span class="material-icons-round">library_add</span>
+          <span data-i18n="btn_import_spotify">Impor Spotify</span>
+        </button>
         <div class="sidebar-tagline" data-i18n="tagline">Musikmu. Ruangmu.</div>
       </div>
     </nav>
@@ -174,6 +178,47 @@
           </div>
         </section>
 
+        <!-- Statistik & Baru Diputar Section -->
+        <section id="library-insights" class="library-insights">
+          <div class="stats-strip">
+            <div class="stat-pill-card">
+              <div class="stat-pill-icon stat-icon-time">
+                <span class="material-icons-round">trending_up</span>
+              </div>
+              <div class="stat-pill-info">
+                <span class="stat-pill-label" data-i18n="stat_listen_time">Waktu Mendengarkan</span>
+                <span id="stat-listen-time" class="stat-pill-value">0 menit</span>
+              </div>
+            </div>
+            <div class="stat-pill-card">
+              <div class="stat-pill-icon stat-icon-lib">
+                <span class="material-icons-round">library_music</span>
+              </div>
+              <div class="stat-pill-info">
+                <span class="stat-pill-label" data-i18n="stat_total_songs">Koleksi Lagu</span>
+                <span id="stat-total-songs" class="stat-pill-value">0 lagu</span>
+              </div>
+            </div>
+            <div class="stat-pill-card">
+              <div class="stat-pill-icon stat-icon-fav">
+                <span class="material-icons-round">favorite</span>
+              </div>
+              <div class="stat-pill-info">
+                <span class="stat-pill-label" data-i18n="stat_liked_songs">Lagu Disukai</span>
+                <span id="stat-liked-songs" class="stat-pill-value">0 lagu</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="recent-played-section" class="recent-played-section hidden">
+            <div class="recent-played-head">
+              <h2 class="section-title" data-i18n="recent_played_title">Baru Diputar</h2>
+              <button type="button" id="btn-clear-recent-played" class="btn-clear-recent" data-i18n="clear_all">Hapus Semua</button>
+            </div>
+            <div id="recent-played-list" class="recent-played-row"></div>
+          </div>
+        </section>
+
         <!-- Koleksi Section -->
         <section class="koleksi-section">
           <div class="koleksi-bar">
@@ -182,6 +227,12 @@
               <span id="lib-count" class="badge-count">0 lagu</span>
             </div>
             <div class="koleksi-actions">
+              <select id="lib-sort-select" class="dl-sort-select" aria-label="Urutkan perpustakaan">
+                <option value="recent" data-i18n="sort_recent">Terbaru</option>
+                <option value="title" selected data-i18n="sort_title">Judul (A–Z)</option>
+                <option value="artist" data-i18n="sort_artist">Artis (A–Z)</option>
+                <option value="duration" data-i18n="sort_duration">Durasi</option>
+              </select>
               <button id="lib-play-all" class="btn btn-primary" aria-label="Putar semua">
                 <span class="material-icons-round">play_arrow</span>
                 <span data-i18n="play_all">Putar semua</span>
@@ -280,7 +331,25 @@
             <span class="material-icons-round">library_music</span>
             <span data-i18n="source_jamendo">Jamendo (Bebas Royalti)</span>
           </button>
+          <button id="btn-online-import-spotify" class="btn btn-spotify" type="button" title="Impor Lagu atau Playlist dari Link Spotify">
+            <span class="material-icons-round">link</span>
+            <span data-i18n="btn_import_spotify_link">Impor Link Spotify</span>
+          </button>
         </div>
+
+        <!-- Spotify Charts Section -->
+        <section id="spotify-charts-section" class="spotify-charts-section">
+          <div class="spotify-charts-head">
+            <div class="spotify-charts-title-wrap">
+              <span class="spotify-charts-dot"></span>
+              <div>
+                <h2 class="section-title" style="margin:0;" data-i18n="spotify_charts_title">Spotify Charts</h2>
+                <p class="spotify-charts-sub" data-i18n="spotify_charts_desc">Tangga lagu &amp; trending populer</p>
+              </div>
+            </div>
+          </div>
+          <div id="spotify-charts-row" class="spotify-charts-row"></div>
+        </section>
 
         <!-- Penala Genre -->
         <section class="tuner" aria-label="Penala genre">
@@ -504,6 +573,10 @@
                 <span class="material-icons-round">add</span>
                 <span data-i18n="btn_new_pl">Playlist baru</span>
               </button>
+              <button id="btn-pl-import-spotify" class="btn btn-spotify" aria-label="Impor Playlist Spotify">
+                <span class="material-icons-round">link</span>
+                <span data-i18n="btn_import_spotify">Impor Spotify</span>
+              </button>
               <div class="sort-chips">
                 <button id="pl-sort-recent" class="chip-sort active" data-sort="recent" data-i18n="sort_recent">Terbaru</button>
                 <button id="pl-sort-name" class="chip-sort" data-sort="name" data-i18n="sort_name">Nama A–Z</button>
@@ -545,6 +618,10 @@
                 </button>
                 <button id="pl-detail-shuffle" class="btn btn-ghost btn-icon" title="Acak" aria-label="Acak Playlist">
                   <span class="material-icons-round">shuffle</span>
+                </button>
+                <button id="pl-detail-download-all" class="btn btn-secondary" title="Unduh semua lagu online di playlist ini" aria-label="Unduh Semua Lagu Playlist">
+                  <span class="material-icons-round">download</span>
+                  <span data-i18n="btn_download_all">Unduh Semua</span>
                 </button>
                 <button id="pl-detail-rename" class="btn btn-ghost btn-icon" title="Ubah Nama" aria-label="Ubah Nama Playlist">
                   <span class="material-icons-round">edit</span>
@@ -670,6 +747,16 @@
                   <div class="lang-option-info">
                     <span class="lang-name">English</span>
                     <span class="lang-native">English</span>
+                  </div>
+                  <span class="material-icons-round lang-check-icon">check_circle</span>
+                </div>
+
+                <!-- Jepang -->
+                <div class="lang-option-card" data-lang="ja" role="button" tabindex="0">
+                  <div class="lang-flag">🇯🇵</div>
+                  <div class="lang-option-info">
+                    <span class="lang-name">日本語</span>
+                    <span class="lang-native">Japanese</span>
                   </div>
                   <span class="material-icons-round lang-check-icon">check_circle</span>
                 </div>
@@ -879,9 +966,9 @@
                 <div class="about-meta">
                   <h3 class="about-app-name">MusikKu Desktop</h3>
                   <div class="about-version-badges">
-                    <span class="badge-pill-accent">Versi 1.0.0</span>
+                    <span class="badge-pill-accent">Versi 1.2.0</span>
                     <span class="badge-pill-neutral">Electron + Node.js</span>
-                    <span class="badge-pill-status">Status: Stabil</span>
+                    <span class="badge-pill-status" data-i18n="about_status">Status: Stabil</span>
                   </div>
                   <p class="about-desc" data-i18n="about_app_desc">
                     Pemutar musik modern berkonsep frosted glassmorphism & vinyl dial player.
@@ -1346,6 +1433,72 @@
     </div>
   </div>
 
+  <!-- ─── Modal: Impor Link Spotify (Lagu / Album / Playlist) ──────────── -->
+  <div id="spotify-import-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="spotify-modal-title">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-badge-icon spotify-badge-icon">
+            <span class="material-icons-round">queue_music</span>
+          </div>
+          <div>
+            <h3 id="spotify-modal-title" data-i18n="spotify_modal_title">Impor dari Spotify</h3>
+            <p class="modal-sub" data-i18n="spotify_modal_sub">Tempel tautan lagu, album, atau playlist Spotify publik</p>
+          </div>
+        </div>
+        <button id="btn-close-spotify-modal" class="modal-close-btn" title="Tutup" aria-label="Tutup Modal">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+        <div class="spotify-url-row">
+          <input type="url" id="input-spotify-url" placeholder="https://open.spotify.com/playlist/..." data-i18n-placeholder="spotify_url_placeholder" autocomplete="off" />
+          <button id="btn-fetch-spotify" class="btn btn-spotify" type="button">
+            <span class="material-icons-round">search</span>
+            <span data-i18n="btn_fetch_spotify">Muat</span>
+          </button>
+        </div>
+
+        <div id="spotify-loading" class="loading-state hidden" style="padding: 24px 0;">
+          <div class="spinner"></div>
+          <p data-i18n="spotify_loading_text">Mengambil daftar lagu dari Spotify...</p>
+        </div>
+
+        <div id="spotify-error" class="spotify-error-box hidden"></div>
+
+        <div id="spotify-preview" class="spotify-preview hidden">
+          <div class="spotify-preview-header">
+            <img id="spotify-preview-cover" class="spotify-preview-cover hidden" alt="Spotify Cover" />
+            <div id="spotify-preview-cover-fallback" class="spotify-preview-cover-fallback">
+              <span class="material-icons-round">music_note</span>
+            </div>
+            <div class="spotify-preview-meta">
+              <span class="badge-spotify" id="spotify-preview-type">PLAYLIST</span>
+              <h4 id="spotify-preview-title">—</h4>
+              <p id="spotify-preview-sub">—</p>
+            </div>
+          </div>
+          <div id="spotify-track-list" class="spotify-track-list"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-cancel-spotify" class="btn btn-ghost" data-i18n="btn_cancel">Batal</button>
+        <div id="spotify-preview-actions" class="spotify-preview-actions hidden">
+          <button id="btn-spotify-play-all" class="btn btn-ghost" type="button">
+            <span class="material-icons-round">play_arrow</span>
+            <span data-i18n="play_all">Putar semua</span>
+          </button>
+          <button id="btn-spotify-save-playlist" class="btn btn-spotify" type="button">
+            <span class="material-icons-round">playlist_add</span>
+            <span data-i18n="btn_spotify_save_pl">Simpan ke Playlist</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── Toast Unduhan ────────────────────────────────────────────────── -->
   <div id="download-toast" class="download-toast hidden" role="alert">
     <div class="toast-icon">
@@ -1363,26 +1516,39 @@
   <div id="track-context-menu" class="context-menu hidden">
     <div class="ctx-item" id="ctx-play">
       <span class="material-icons-round">play_arrow</span>
-      Putar sekarang
+      <span data-i18n="ctx_play_now">Putar sekarang</span>
+    </div>
+    <div class="ctx-item" id="ctx-play-next">
+      <span class="material-icons-round">playlist_play</span>
+      <span data-i18n="ctx_play_next">Putar berikutnya</span>
+    </div>
+    <div class="ctx-item" id="ctx-add-queue">
+      <span class="material-icons-round">add_to_queue</span>
+      <span data-i18n="ctx_add_queue">Tambah ke antrean</span>
     </div>
     <div class="ctx-item" id="ctx-fav">
       <span class="material-icons-round">favorite_border</span>
-      Tambah ke favorit
+      <span>Tambah ke favorit</span>
     </div>
     <div class="ctx-item" id="ctx-change-cover">
       <span class="material-icons-round">add_photo_alternate</span>
-      Ganti foto album...
+      <span data-i18n="ctx_change_cover">Ganti foto album...</span>
     </div>
     <div class="ctx-item hidden" id="ctx-reset-cover">
       <span class="material-icons-round">restore</span>
-      Kembalikan foto asli
+      <span data-i18n="ctx_reset_cover">Kembalikan foto asli</span>
     </div>
     <div class="ctx-divider"></div>
-    <div class="ctx-subhead">Tambah ke playlist:</div>
+    <div class="ctx-subhead" data-i18n="ctx_add_to_pl_sub">Tambah ke playlist:</div>
     <div id="ctx-pl-list" class="ctx-pl-items"></div>
     <div class="ctx-item" id="ctx-new-pl">
       <span class="material-icons-round">add</span>
-      Buat playlist baru...
+      <span data-i18n="ctx_new_pl">Buat playlist baru...</span>
+    </div>
+    <div class="ctx-divider hidden" id="ctx-delete-divider"></div>
+    <div class="ctx-item ctx-item-danger hidden" id="ctx-delete-device">
+      <span class="material-icons-round">delete_outline</span>
+      <span data-i18n="ctx_delete_device">Hapus dari perangkat</span>
     </div>
   </div>
 

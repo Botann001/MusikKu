@@ -268,7 +268,7 @@ fun SpotifyProfileDrawerContent(
                 Spacer(modifier = Modifier.height(6.dp))
             }
             Text(
-                text = "MusikKu v1.0.0 • Modern Music Player",
+                text = "MusikKu v${com.example.musikku.BuildConfig.VERSION_NAME} • Modern Music Player",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.35f),
                 letterSpacing = 0.5.sp

@@ -111,4 +111,15 @@
     <string name="stats_liked_songs">お気に入りの曲</string>
     <string name="stats_liked_songs_desc">ハートを付けた曲</string>
     <string name="stats_close">閉じる</string>
+
+    <!-- Song Row Menu & Delete Dialog -->
+    <string name="song_options">曲のオプション</string>
+    <string name="menu_play_next">次に再生</string>
+    <string name="menu_add_to_queue">キューに追加</string>
+    <string name="menu_add_to_playlist">プレイリストに追加</string>
+    <string name="menu_delete_from_device">デバイスから削除</string>
+    <string name="delete_song_title">曲を削除しますか？</string>
+    <string name="delete_song_confirm_msg">この曲をデバイスのストレージから削除してもよろしいですか？</string>
+    <string name="delete_song_warning_msg">ファイルはデバイスから完全に削除され、復元することはできません。</string>
+    <string name="delete_song_confirm_btn">完全に削除</string>
 </resources>

@@ -1467,7 +1467,7 @@ body.resizing-sidebar .rail {
 
 .track {
   display: grid;
-  grid-template-columns: 56px 60px minmax(0,1fr) 44px 44px 64px;
+  grid-template-columns: 56px 60px minmax(0,1fr) 44px 44px 64px 36px;
   column-gap: 16px;
   align-items: center;
   padding: 10px 16px;
@@ -2791,6 +2791,540 @@ body.resizing-sidebar .rail {
 
 .ctx-item:hover .material-icons-round {
   color: var(--accent);
+}
+
+.ctx-item.ctx-item-danger {
+  color: #ef4444;
+}
+
+.ctx-item.ctx-item-danger .material-icons-round {
+  color: #ef4444;
+}
+
+.ctx-item.ctx-item-danger:hover {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+}
+
+.ctx-item.ctx-item-danger:hover .material-icons-round {
+  color: #f87171;
+}
+
+/* ─── Spotify Import UI Styles ────────────────────────────────────────── */
+.btn-sidebar-spotify {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(29, 185, 84, 0.35);
+  background: rgba(29, 185, 84, 0.14);
+  color: #1DB954;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-sidebar-spotify:hover {
+  background: rgba(29, 185, 84, 0.24);
+  border-color: #1DB954;
+}
+
+.btn-spotify {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1DB954;
+  color: #071A0E;
+  border: none;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: var(--r-pill, 999px);
+  cursor: pointer;
+  transition: filter 0.18s ease, transform 0.12s ease;
+}
+
+.btn-spotify:hover {
+  filter: brightness(1.08);
+}
+
+.btn-spotify:active {
+  transform: scale(0.98);
+}
+
+.source-switcher .btn-spotify {
+  margin-left: auto;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.spotify-badge-icon {
+  background: rgba(29, 185, 84, 0.18) !important;
+  color: #1DB954 !important;
+}
+
+.spotify-url-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.spotify-url-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-tint);
+  color: var(--text);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.spotify-url-row input:focus {
+  border-color: #1DB954;
+}
+
+.spotify-error-box {
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.spotify-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spotify-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--panel-tint);
+  border: 1px solid var(--line);
+}
+
+.spotify-preview-cover,
+.spotify-preview-cover-fallback {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.spotify-preview-cover-fallback {
+  background: rgba(29, 185, 84, 0.18);
+  color: #1DB954;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spotify-preview-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.spotify-preview-meta h4 {
+  margin: 4px 0 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-preview-meta p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.badge-spotify {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(29, 185, 84, 0.18);
+  color: #1DB954;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.spotify-track-list {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.spotify-track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--panel-tint);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.spotify-track-item:hover {
+  background: var(--card-hover);
+  border-color: rgba(29, 185, 84, 0.4);
+}
+
+.spotify-track-idx {
+  width: 24px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.spotify-track-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spotify-track-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-track-artist {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-track-dur {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.spotify-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Stats Strip & Recently Played (Perpustakaan) ────────────────────── */
+.library-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat-pill-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  border: 1px solid var(--line);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.stat-pill-card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.stat-pill-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-icon-time {
+  background: rgba(29, 185, 84, 0.14);
+  color: #1DB954;
+}
+
+.stat-icon-lib {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+}
+
+.stat-icon-fav {
+  background: rgba(244, 63, 94, 0.14);
+  color: #f43f5e;
+}
+
+.stat-pill-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-pill-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-pill-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.recent-played-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recent-played-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recent-played-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.recent-played-card {
+  width: 158px;
+  flex-shrink: 0;
+  padding: 10px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.14s ease;
+}
+
+.recent-played-card:hover {
+  background: var(--card-hover);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.recent-played-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-tint);
+  position: relative;
+}
+
+.recent-played-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recent-played-play-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.recent-played-card:hover .recent-played-play-badge {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.recent-played-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-played-artist {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Spotify Charts Row (Jelajah Online) ─────────────────────────────── */
+.spotify-charts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spotify-charts-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spotify-charts-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1DB954;
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.6);
+}
+
+.spotify-charts-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.spotify-charts-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.spotify-chart-card {
+  width: 196px;
+  flex-shrink: 0;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.spotify-chart-card:hover {
+  transform: translateY(-2px);
+  border-color: #1DB954;
+  background: var(--card-hover);
+}
+
+.spotify-chart-art {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+}
+
+.spotify-chart-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.spotify-chart-badge {
+  position: relative;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+
+.spotify-chart-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1DB954;
+  color: #071A0E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.spotify-chart-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-chart-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
 }
 
 .ctx-divider {
